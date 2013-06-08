@@ -1,0 +1,17 @@
+{
+    "name": "fxrm/store",
+    "description": "Framework-agnostic storage implementation",
+    "authors": [
+        {
+            "name": "Nick Matantsev",
+            "email": "unframework@github.com"
+        }
+    ],
+    "autoload": {
+        "psr-0": {
+            "Fxrm": "src/"
+        }
+    },
+    "require": {
+    }
+}
