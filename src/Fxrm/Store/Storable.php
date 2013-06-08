@@ -3,7 +3,9 @@
 namespace Fxrm\Store;
 
 class Storable {
-    static function implement($className, $backend, array $constructArguments) {
+    static function implement($className, $backend) {
+        $constructArguments = array_slice(func_get_args(), 2);
+
         $serializer = new Serializer();
 
         $classInfo = new \ReflectionClass($className);
