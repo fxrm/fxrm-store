@@ -26,10 +26,28 @@ class Serializer {
             return null;
         }
 
-        $class = "\\$class"; // fully qualified class
+        // reify using deserialization trick to avoid triggering validation
+        if ($class[0] === '\\') {
+            $class = substr($class, 1);
+        }
 
-        // @todo reify using deserialization tricks to avoid triggering validation
-        return new $class($v);
+        $classInfo = new \ReflectionClass($class);
+        $properties = $classInfo->getProperties();
+
+        if (count($properties) !== 1) {
+            throw new \Exception('value class must have one property');
+        }
+
+        $internalName = "\x00" . $class . "\x00" . $properties[0]->getName();
+
+        $bin = 'O:' . strlen($class) . ':"' . $class . '":1:{s:' . strlen($internalName) . ':"' . $internalName . '";s:' . strlen($v) . ':"' . $v . '";}';
+        $obj = unserialize($bin);
+
+        if ($obj === false) {
+            throw new \Exception('error reifying value object');
+        }
+
+        return $obj;
     }
 
     function fromIdentity($obj) {
