@@ -16,8 +16,21 @@ class Serializer {
             return null;
         }
 
-        // @todo allow customizing this
-        return (string)$obj;
+        // use serialization trick to extract value
+        $bin = serialize($obj);
+        $class = get_class($obj);
+        $internalName = $this->getValuePropertyInternalName($class);
+
+        $binPrefix = 'O:' . strlen($class) . ':"' . $class . '":1:{s:' . strlen($internalName) . ':"' . $internalName . '";';
+        $binSuffix = '}';
+
+        if (substr($bin, 0, strlen($binPrefix)) !== $binPrefix || substr($bin, -strlen($binSuffix)) !== $binSuffix) {
+            throw new \Exception('could not serialize value');
+        }
+
+        $valueBin = substr($bin, strlen($binPrefix), -strlen($binSuffix));
+
+        return unserialize($valueBin);
     }
 
     function toValue($class, $v) {
@@ -31,14 +44,7 @@ class Serializer {
             $class = substr($class, 1);
         }
 
-        $classInfo = new \ReflectionClass($class);
-        $properties = $classInfo->getProperties();
-
-        if (count($properties) !== 1) {
-            throw new \Exception('value class must have one property');
-        }
-
-        $internalName = "\x00" . $class . "\x00" . $properties[0]->getName();
+        $internalName = $this->getValuePropertyInternalName($class);
 
         $bin = 'O:' . strlen($class) . ':"' . $class . '":1:{s:' . strlen($internalName) . ':"' . $internalName . '";s:' . strlen($v) . ':"' . $v . '";}';
         $obj = unserialize($bin);
@@ -79,6 +85,17 @@ class Serializer {
         }
 
         return $this->fromString->$key;
+    }
+
+    private function getValuePropertyInternalName($class) {
+        $classInfo = new \ReflectionClass($class);
+        $properties = $classInfo->getProperties();
+
+        if (count($properties) !== 1) {
+            throw new \Exception('value class must have one property');
+        }
+
+        return "\x00" . $class . "\x00" . $properties[0]->getName();
     }
 }
 

@@ -2,6 +2,7 @@
 
 namespace Fxrm\Store;
 
+// @todo if an identity class is abstract, store the real class in a field + "Class" column
 class Storable {
     static function implement($className, $backend) {
         $constructArguments = array_slice(func_get_args(), 2);
