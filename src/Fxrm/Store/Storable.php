@@ -116,6 +116,7 @@ class Storable {
         $source[] = var_export($signature->fullName, true) . ', ';
         $source[] = var_export($signature->firstParameterClass, true) . ', ';
         $source[] = self::externExpr($signature->firstParameterClass, '$a0') . ', ';
+        $source[] = var_export($signature->returnClass, true) . ', ';
         $source[] = var_export(lcfirst(substr($info->getName(), strlen($fullPrefix))), true);
         $source[] = ');';
         $source[] = 'return ' . self::internExpr($signature->returnClass, '$result') . ';';

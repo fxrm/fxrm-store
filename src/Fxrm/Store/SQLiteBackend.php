@@ -13,7 +13,7 @@ class SQLiteBackend {
         $stmt = $this->pdo->prepare($this->getCustomQuery($method) ?: $this->generateFindQuery($entity, array_keys($valueMap), $multiple));
 
         foreach ($valueMap as $field => $value) {
-            $stmt->bindValue(':' . $field, $value);
+            $stmt->bindValue(':' . $field, $this->fromValue($value));
         }
 
         $stmt->execute();
@@ -27,7 +27,7 @@ class SQLiteBackend {
         return $multiple ? $rows : (count($rows) === 0 ? null : (string)$rows[0]);
     }
 
-    function get($method, $entity, $id, $field) {
+    function get($method, $entity, $id, $hintClass, $field) {
         // @todo use the original model parameter name as query param
         $sql = $this->getCustomQuery($method) ?: $this->generateGetQuery($entity, $field);
 
@@ -45,7 +45,7 @@ class SQLiteBackend {
             throw new \Exception('object not found');
         }
 
-        return $rows[0];
+        return $hintClass === 'DateTime' ? new \DateTime('@' . $rows[0]) : $rows[0];
     }
 
     function set($method, $entity, $id, $valueMap) {
@@ -55,7 +55,7 @@ class SQLiteBackend {
 
         $valueCount = 0;
         foreach ($valueMap as $field => $value) {
-            $stmt->bindValue(':' . $field, $value);
+            $stmt->bindValue(':' . $field, $this->fromValue($value));
             $valueCount += 1;
         }
 
@@ -72,7 +72,7 @@ class SQLiteBackend {
         $stmt = $this->pdo->prepare($this->getCustomQuery($method) ?: $this->generateCreateQuery($entity, array_keys($valueMap)));
 
         foreach ($valueMap as $field => $value) {
-            $stmt->bindValue(':' . $field, $value);
+            $stmt->bindValue(':' . $field, $this->fromValue($value));
         }
 
         $stmt->execute();
@@ -81,6 +81,14 @@ class SQLiteBackend {
         $stmt->closeCursor();
 
         return $id;
+    }
+
+    private function fromValue($value) {
+        if ($value instanceof \DateTime) {
+            return $value->getTimestamp();
+        }
+
+        return $value;
     }
 
     private function generateFindQuery($entity, $fieldList, $multiple) {

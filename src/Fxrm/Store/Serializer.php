@@ -10,6 +10,7 @@ class Serializer {
         $this->fromString = (object)array();
     }
 
+    // @todo these belong inside the backend implementation itself?
     function fromValue($obj) {
         // passthrough null
         if ($obj === null) {
