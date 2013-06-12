@@ -16,6 +16,10 @@ class Serializer {
             return null;
         }
 
+        if ($obj instanceof \DateTime) {
+            return $obj;
+        }
+
         // use serialization trick to extract value
         $bin = serialize($obj);
         $class = get_class($obj);
@@ -37,6 +41,10 @@ class Serializer {
         // passthrough null
         if ($v === null) {
             return null;
+        }
+
+        if ($class === 'DateTime') {
+            return $v;
         }
 
         // reify using deserialization trick to avoid triggering validation
