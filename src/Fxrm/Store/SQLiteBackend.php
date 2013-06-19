@@ -68,13 +68,8 @@ class SQLiteBackend {
         $stmt->closeCursor();
     }
 
-    function create($method, $entity, $valueMap) {
-        $stmt = $this->pdo->prepare($this->getCustomQuery($method) ?: $this->generateCreateQuery($entity, array_keys($valueMap)));
-
-        foreach ($valueMap as $field => $value) {
-            $stmt->bindValue(':' . $field, $this->fromValue($value));
-        }
-
+    function create($entity) {
+        $stmt = $this->pdo->prepare($this->generateCreateQuery($entity));
         $stmt->execute();
         $id = $this->pdo->lastInsertId();
 
@@ -133,30 +128,8 @@ class SQLiteBackend {
         return join('', $sql);
     }
 
-    private function generateCreateQuery($entity, $fieldList) {
-        $sql[] = 'INSERT INTO "' . $this->getTableName($entity) . '" (';
-
-        foreach ($fieldList as $i => $field) {
-            if ($i > 0) {
-                $sql[] = ',';
-            }
-
-            $sql[] = '"' . $field . '"';
-        }
-
-        $sql[] = ') VALUES (';
-
-        foreach ($fieldList as $i => $field) {
-            if ($i > 0) {
-                $sql[] = ',';
-            }
-
-            $sql[] = ':' . $field;
-        }
-
-        $sql[] = ')';
-
-        return join('', $sql);
+    private function generateCreateQuery($entity) {
+        return 'INSERT INTO "' . $this->getTableName($entity) . '" (ROWID) VALUES (NULL)';
     }
 
     private function getTableName($idClass) {

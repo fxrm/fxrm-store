@@ -7,7 +7,7 @@ class Storable {
     static function implement($className, $backend) {
         $constructArguments = array_slice(func_get_args(), 2);
 
-        $serializer = new Serializer();
+        $serializer = new Serializer($backend);
 
         $classInfo = new \ReflectionClass($className);
 
@@ -50,12 +50,10 @@ class Storable {
 
             if (substr($name, 0, 3) === 'get') {
                 $implementationSource[] = self::defineGetter($methodInfo);
-            } elseif (substr($name, 0, 3) === 'set') {
-                $implementationSource[] = self::defineSetter($methodInfo);
-            } elseif (substr($name, 0, 6) === 'create') {
-                $implementationSource[] = self::defineCreator($methodInfo);
-            } else {
+            } elseif (substr($name, 0, 4) === 'find') {
                 $implementationSource[] = self::defineFinder($methodInfo);
+            } else {
+                $implementationSource[] = self::defineSetter($methodInfo);
             }
         }
 
@@ -89,7 +87,7 @@ class Storable {
     private static function externExpr($class, $expr) {
         return $class === null ? $expr : (
             substr($class, -2) === 'Id' ?
-                '$this->s->fromIdentity(' . $expr . ')' :
+                '$this->s->fromIdentity(' . $expr . ',true)' :
                 '$this->s->fromValue(' . $expr . ')'
             );
     }
@@ -191,36 +189,6 @@ class Storable {
         }
 
         $source[] = 'return $result;';
-        $source[] = '}';
-
-        return join('', $source);
-    }
-
-    private static function defineCreator(\ReflectionMethod $info) {
-        $signature = self::getSignature($info);
-
-        if (count((array)$signature->parameters) < 1) {
-            throw new \Exception('creators must have at least one parameter');
-        }
-
-        $source[] = $signature->preamble . ' {';
-        $source[] = '$result = $this->db->create(';
-        $source[] = var_export($signature->fullName, true) . ', ';
-        $source[] = var_export($signature->returnClass, true) . ', ';
-        $source[] = 'array(';
-
-        $count = 0;
-        foreach ($signature->parameters as $param => $class) {
-            $source[] = ($count === 0 ? '' : ',');
-            $source[] = var_export($param, true);
-            $source[] = ' => ';
-            $source[] = self::externExpr($class, '$a' . $count);
-
-            $count += 1;
-        }
-
-        $source[] = '));';
-        $source[] = 'return ' . self::internExpr($signature->returnClass, '$result') . ';';
         $source[] = '}';
 
         return join('', $source);

@@ -4,8 +4,10 @@ namespace Fxrm\Store;
 
 class Serializer {
     private $toString, $fromString;
+    private $backend;
 
-    function __construct() {
+    function __construct($backend) {
+        $this->backend = $backend;
         $this->toString = new \SplObjectStorage();
         $this->fromString = (object)array();
     }
@@ -65,14 +67,25 @@ class Serializer {
         return $obj;
     }
 
-    function fromIdentity($obj) {
+    function fromIdentity($obj, $autoCreate = false) {
         // passthrough null
         if ($obj === null) {
             return null;
         }
 
         if ( ! isset($this->toString[$obj])) {
-            throw new \Exception('unknown object');
+            if ( ! $autoCreate) {
+                throw new \Exception('unknown object');
+            }
+
+            $class = get_class($obj);
+            $id = $this->backend->create($class);
+
+            $class = "\\$class"; // fully qualified class
+            $key = $class . '$' . $id; // using special separator character
+
+            $this->fromString->$key = $obj;
+            $this->toString[$obj] = $id;
         }
 
         return $this->toString[$obj];
