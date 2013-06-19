@@ -4,10 +4,15 @@ namespace Fxrm\Store;
 
 // @todo if an identity class is abstract, store the real class in a field + "Class" column
 class Storable {
-    static function implement($className, $backend) {
-        $constructArguments = array_slice(func_get_args(), 2);
+    private $backend, $serializer;
 
-        $serializer = new Serializer($backend);
+    function __construct($backend) {
+        $this->backend = $backend;
+        $this->serializer = new Serializer($backend);
+    }
+
+    function implement($className) {
+        $constructArguments = array_slice(func_get_args(), 1);
 
         $classInfo = new \ReflectionClass($className);
 
@@ -63,7 +68,7 @@ class Storable {
         //echo(join('', $implementationSource));
         eval(join('', $implementationSource));
 
-        return new $implementationName($serializer, $backend, $constructArguments);
+        return new $implementationName($this->serializer, $this->backend, $constructArguments);
     }
 
     public static function extern($instance, $obj) {
