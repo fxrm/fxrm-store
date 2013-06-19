@@ -21,13 +21,13 @@ class Storable {
 
         $implementationSource[] = 'class ' . $implementationName;
         $implementationSource[] = ' extends \\' . $classInfo->getName();
-        $implementationSource[] = '{ private $db, $s;';
+        $implementationSource[] = '{ private $s;';
 
         // implement constructor
         $constructorInfo = $classInfo->getConstructor();
 
-        $implementationSource[] = 'function __construct($s, $db, $args) {';
-        $implementationSource[] = '$this->db = $db; $this->s = $s;'; // this must be set before calling parent
+        $implementationSource[] = 'function __construct($s, $args) {';
+        $implementationSource[] = '$this->s = $s;'; // this must be set before calling parent
 
         if ($constructorInfo) {
             $implementationSource[] = 'parent::__construct(';
@@ -62,39 +62,83 @@ class Storable {
             }
         }
 
-        $implementationSource[] = 'public static function _getSerializer($instance) { return $instance->s; }';
+        $implementationSource[] = 'public static function _getStorable($instance) { return $instance->s; }';
         $implementationSource[] = '}';
 
         //echo(join('', $implementationSource));
         eval(join('', $implementationSource));
 
-        return new $implementationName($this->serializer, $this->backend, $constructArguments);
+        return new $implementationName($this, $constructArguments);
     }
 
     public static function extern($instance, $obj) {
         // explicitly deal with identities only - values are not a concern
-        $instance::_getSerializer()->fromIdentity($obj);
+        $instance::_getStorable()->fromIdentity($obj);
     }
 
     public static function intern($instance, $class, $id) {
         // explicitly deal with identities only - values are not a concern
-        $instance::_getSerializer()->toIdentity($class, $id);
+        $instance::_getStorable()->toIdentity($class, $id);
     }
 
-    private static function internExpr($class, $expr) {
-        return $class === null ? $expr : (
+    private function internAny($class, $value) {
+        return $class === null ? $value : (
             substr($class, -2) === 'Id' ?
-                '$this->s->toIdentity(' . var_export($class, true) . ',' . $expr . ')' :
-                '$this->s->toValue(' . var_export($class, true) . ',' . $expr . ')'
+                $this->serializer->toIdentity($class, $value) :
+                $this->serializer->toValue($class, $value)
             );
     }
 
-    private static function externExpr($class, $expr) {
-        return $class === null ? $expr : (
+    private function externAny($class, $value) {
+        return $class === null ? $value : (
             substr($class, -2) === 'Id' ?
-                '$this->s->fromIdentity(' . $expr . ',true)' :
-                '$this->s->fromValue(' . $expr . ')'
+                $this->serializer->fromIdentity($value, true) :
+                $this->serializer->fromValue($value)
             );
+    }
+
+    function get($implName, $idClass, $idObj, $propertyClass, $propertyName) {
+        $id = $this->serializer->fromIdentity($idObj, true);
+
+        $value = $this->backend->get($implName, $idClass, $id, $propertyClass, $propertyName);
+
+        return $this->internAny($propertyClass, $value);
+    }
+
+    function set($implName, $idClass, $idObj, $properties) {
+        $id = $this->serializer->fromIdentity($idObj, true);
+
+        $values = array();
+
+        foreach ($properties as $propertyName => $qualifiedValue) {
+            list($propertyClass, $value) = $qualifiedValue;
+
+            $values[$propertyName] = $this->externAny($propertyClass, $value);
+        }
+
+        $this->backend->set($implName, $idClass, $id, $values);
+    }
+
+    function find($implName, $idClass, $properties, $returnArray) {
+        $values = array();
+
+        foreach ($properties as $propertyName => $qualifiedValue) {
+            list($propertyClass, $value) = $qualifiedValue;
+
+            $values[$propertyName] = $this->externAny($propertyClass, $value);
+        }
+
+        $data = $this->backend->find($implName, $idClass, $values, $returnArray);
+
+        if ($returnArray) {
+            foreach ($data as &$value) {
+                $value = $this->serializer->toIdentity($idClass, $value);
+            }
+        } else {
+            $data = $this->serializer->toIdentity($idClass, $data);
+        }
+
+        return $data;
     }
 
     private static function defineGetter(\ReflectionMethod $info) {
@@ -115,14 +159,13 @@ class Storable {
         }
 
         $source[] = $signature->preamble . ' {';
-        $source[] = '$result = $this->db->get(';
+        $source[] = 'return $this->s->get(';
         $source[] = var_export($signature->fullName, true) . ', ';
         $source[] = var_export($signature->firstParameterClass, true) . ', ';
-        $source[] = self::externExpr($signature->firstParameterClass, '$a0') . ', ';
+        $source[] = '$a0, ';
         $source[] = var_export($signature->returnClass, true) . ', ';
         $source[] = var_export(lcfirst(substr($info->getName(), strlen($fullPrefix))), true);
         $source[] = ');';
-        $source[] = 'return ' . self::internExpr($signature->returnClass, '$result') . ';';
         $source[] = '}';
 
         return join('', $source);
@@ -136,10 +179,10 @@ class Storable {
         }
 
         $source[] = $signature->preamble . ' {';
-        $source[] = '$this->db->set(';
+        $source[] = '$this->s->set(';
         $source[] = var_export($signature->fullName, true) . ', ';
         $source[] = var_export($signature->firstParameterClass, true) . ', ';
-        $source[] = self::externExpr($signature->firstParameterClass, '$a0') . ', ';
+        $source[] = '$a0, ';
         $source[] = 'array(';
 
         $count = 0;
@@ -148,8 +191,9 @@ class Storable {
             if ($count > 0) {
                 $source[] = ($count === 1 ? '' : ',');
                 $source[] = var_export($param, true);
-                $source[] = ' => ';
-                $source[] = self::externExpr($class, '$a' . $count);
+                $source[] = ' => array(';
+                $source[] = var_export($class, true) . ', ' . '$a' . $count;
+                $source[] = ')';
             }
 
             $count += 1;
@@ -167,7 +211,7 @@ class Storable {
         $isArray = property_exists($signature, 'returnArrayClass');
 
         $source[] = $signature->preamble . ' {';
-        $source[] = '$result = $this->db->find(';
+        $source[] = 'return $this->s->find(';
         $source[] = var_export($signature->fullName, true) . ', ';
         $source[] = var_export($isArray ? $signature->returnArrayClass : $signature->returnClass, true) . ', ';
         $source[] = 'array(';
@@ -176,8 +220,9 @@ class Storable {
         foreach ($signature->parameters as $param => $class) {
             $source[] = ($count === 0 ? '' : ',');
             $source[] = var_export($param, true);
-            $source[] = ' => ';
-            $source[] = self::externExpr($class, '$a' . $count);
+            $source[] = ' => array(';
+            $source[] = var_export($class, true) . ', ' . '$a' . $count;
+            $source[] = ')';
 
             $count += 1;
         }
@@ -185,15 +230,6 @@ class Storable {
         $source[] = '),';
         $source[] = $isArray ? 'true' : 'false';
         $source[] = ');';
-
-        if ($isArray) {
-            // @todo encapsulate this to avoid inefficient generated code
-            $source[] = 'foreach ($result as &$row) $row = ' . self::internExpr($signature->returnArrayClass, '$row') . ';';
-        } else {
-            $source[] = '$result = ' . self::internExpr($signature->returnClass, '$result') . ';';
-        }
-
-        $source[] = 'return $result;';
         $source[] = '}';
 
         return join('', $source);
