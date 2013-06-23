@@ -4,11 +4,22 @@ namespace Fxrm\Store;
 
 // @todo if an identity class is abstract, store the real class in a field + "Class" column
 class Storable {
-    private $backend, $serializer;
+    private $backend;
+    private $serializerMap;
 
-    function __construct($backend) {
+    function __construct($backend, $configPath) {
+        $config = json_decode(file_get_contents($configPath));
+
         $this->backend = $backend;
-        $this->serializer = new Serializer($backend);
+        $this->serializerMap = (object)array();
+
+        foreach ($config->idClasses as $idClass => $backendName) {
+            $this->serializerMap->$idClass = new IdentitySerializer($idClass, $backend);
+        }
+
+        foreach ($config->valueClasses as $valueClass) {
+            $this->serializerMap->$valueClass = new ValueSerializer($valueClass);
+        }
     }
 
     function implement($className) {
@@ -82,23 +93,15 @@ class Storable {
     }
 
     private function internAny($class, $value) {
-        return $class === null ? $value : (
-            substr($class, -2) === 'Id' ?
-                $this->serializer->toIdentity($class, $value) :
-                $this->serializer->toValue($class, $value)
-            );
+        return $class === null ? $value : $this->serializerMap->$class->intern($value);
     }
 
     private function externAny($class, $value) {
-        return $class === null ? $value : (
-            substr($class, -2) === 'Id' ?
-                $this->serializer->fromIdentity($value, true) :
-                $this->serializer->fromValue($value)
-            );
+        return $class === null ? $value : $this->serializerMap->$class->extern($value);
     }
 
     function get($implName, $idClass, $idObj, $propertyClass, $propertyName) {
-        $id = $this->serializer->fromIdentity($idObj, true);
+        $id = $this->externAny($idClass, $idObj);
 
         $value = $this->backend->get($implName, $idClass, $id, $propertyClass, $propertyName);
 
@@ -106,7 +109,7 @@ class Storable {
     }
 
     function set($implName, $idClass, $idObj, $properties) {
-        $id = $this->serializer->fromIdentity($idObj, true);
+        $id = $this->externAny($idClass, $idObj);
 
         $values = array();
 
@@ -132,10 +135,10 @@ class Storable {
 
         if ($returnArray) {
             foreach ($data as &$value) {
-                $value = $this->serializer->toIdentity($idClass, $value);
+                $value = $this->internAny($idClass, $value);
             }
         } else {
-            $data = $this->serializer->toIdentity($idClass, $data);
+            $data = $this->internAny($idClass, $data);
         }
 
         return $data;
