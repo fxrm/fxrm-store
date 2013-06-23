@@ -3,18 +3,26 @@
 namespace Fxrm\Store;
 
 // @todo if an identity class is abstract, store the real class in a field + "Class" column
-class Storable {
-    private $backend;
+class Environment {
+    private $backendMap;
     private $serializerMap;
 
-    function __construct($backend, $configPath) {
+    function __construct($configPath) {
         $config = json_decode(file_get_contents($configPath));
 
-        $this->backend = $backend;
+        // set up backends
+        $this->backendMap = (object)array();
+
+        foreach ($config->backends as $backendName => $backendArgs) {
+            $backendClass = new \ReflectionClass(array_shift($backendArgs));
+            $this->backendMap->$backendName = $backendClass->newInstanceArgs($backendArgs);
+        }
+
+        // set up serializers
         $this->serializerMap = (object)array();
 
         foreach ($config->idClasses as $idClass => $backendName) {
-            $this->serializerMap->$idClass = new IdentitySerializer($idClass, $backend);
+            $this->serializerMap->$idClass = new IdentitySerializer($idClass, $this->backendMap->$backendName);
         }
 
         foreach ($config->valueClasses as $valueClass) {
@@ -103,7 +111,7 @@ class Storable {
     function get($implName, $idClass, $idObj, $propertyClass, $propertyName) {
         $id = $this->externAny($idClass, $idObj);
 
-        $value = $this->backend->get($implName, $idClass, $id, $propertyClass, $propertyName);
+        $value = $this->backendMap->default->get($implName, $idClass, $id, $propertyClass, $propertyName);
 
         return $this->internAny($propertyClass, $value);
     }
@@ -119,7 +127,7 @@ class Storable {
             $values[$propertyName] = $this->externAny($propertyClass, $value);
         }
 
-        $this->backend->set($implName, $idClass, $id, $values);
+        $this->backendMap->default->set($implName, $idClass, $id, $values);
     }
 
     function find($implName, $idClass, $properties, $returnArray) {
@@ -131,7 +139,7 @@ class Storable {
             $values[$propertyName] = $this->externAny($propertyClass, $value);
         }
 
-        $data = $this->backend->find($implName, $idClass, $values, $returnArray);
+        $data = $this->backendMap->default->find($implName, $idClass, $values, $returnArray);
 
         if ($returnArray) {
             foreach ($data as &$value) {
