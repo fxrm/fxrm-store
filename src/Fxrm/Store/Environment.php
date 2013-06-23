@@ -7,6 +7,8 @@ class Environment {
     private $backendMap;
     private $serializerMap;
 
+    private $defaultBackend;
+
     function __construct($configPath) {
         $config = json_decode(file_get_contents($configPath));
 
@@ -17,6 +19,8 @@ class Environment {
             $backendClass = new \ReflectionClass(array_shift($backendArgs));
             $this->backendMap->$backendName = $backendClass->newInstanceArgs($backendArgs);
         }
+
+        $this->defaultBackend = $this->backendMap->{$config->defaultBackend};
 
         // set up serializers
         $this->serializerMap = (object)array();
@@ -108,10 +112,14 @@ class Environment {
         return $class === null ? $value : $this->serializerMap->$class->extern($value);
     }
 
+    private function getBackend($implName) {
+        return $this->defaultBackend;
+    }
+
     function get($implName, $idClass, $idObj, $propertyClass, $propertyName) {
         $id = $this->externAny($idClass, $idObj);
 
-        $value = $this->backendMap->default->get($implName, $idClass, $id, $propertyClass, $propertyName);
+        $value = $this->getBackend($implName)->get($implName, $idClass, $id, $propertyClass, $propertyName);
 
         return $this->internAny($propertyClass, $value);
     }
@@ -127,7 +135,7 @@ class Environment {
             $values[$propertyName] = $this->externAny($propertyClass, $value);
         }
 
-        $this->backendMap->default->set($implName, $idClass, $id, $values);
+        $this->getBackend($implName)->set($implName, $idClass, $id, $values);
     }
 
     function find($implName, $idClass, $properties, $returnArray) {
@@ -139,7 +147,7 @@ class Environment {
             $values[$propertyName] = $this->externAny($propertyClass, $value);
         }
 
-        $data = $this->backendMap->default->find($implName, $idClass, $values, $returnArray);
+        $data = $this->getBackend($implName)->find($implName, $idClass, $values, $returnArray);
 
         if ($returnArray) {
             foreach ($data as &$value) {
