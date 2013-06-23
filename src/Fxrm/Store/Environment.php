@@ -94,14 +94,28 @@ class Environment {
         return new $implementationName($this, $constructArguments);
     }
 
-    public static function extern($instance, $obj) {
+    public function extern($obj) {
+        $className = get_class($obj);
+        $serializer = $this->serializerMap->$className;
+
         // explicitly deal with identities only - values are not a concern
-        $instance::_getStorable()->fromIdentity($obj);
+        if (!($serializer instanceof IdentitySerializer)) {
+            throw new \Exception('only identities can be externalized'); // developer error
+        }
+
+        return $serializer->externWithoutCreating($obj);
     }
 
-    public static function intern($instance, $class, $id) {
+    public function intern($className, $id) {
+        $serializer = $this->serializerMap->$className;
+
         // explicitly deal with identities only - values are not a concern
-        $instance::_getStorable()->toIdentity($class, $id);
+        if (!($serializer instanceof IdentitySerializer)) {
+            throw new \Exception('only identities can be externalized'); // developer error
+        }
+
+        // explicitly deal with identities only - values are not a concern
+        return $serializer->intern($id);
     }
 
     private function internAny($class, $value) {

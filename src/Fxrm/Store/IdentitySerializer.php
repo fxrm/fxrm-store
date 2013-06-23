@@ -38,6 +38,10 @@ class IdentitySerializer {
         return $this->toString[$obj];
     }
 
+    function externWithoutCreating($obj) {
+        return $this->extern($obj, true);
+    }
+
     function intern($id) {
         // passthrough null
         if ($id === null) {
