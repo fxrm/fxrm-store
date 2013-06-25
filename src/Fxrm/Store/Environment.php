@@ -9,6 +9,8 @@ class Environment {
     private $idClassMap;
     private $methodMap;
 
+    private static $PRIMITIVE_TYPES = array('string', 'integer', 'int'); // @todo add more
+
     function __construct($configPath) {
         $config = json_decode(file_get_contents($configPath));
 
@@ -127,8 +129,18 @@ class Environment {
         return $serializer->intern($id);
     }
 
-    private function internAny($type, $value) {
-        return ($type === null || is_array($type)) ? $value : $this->serializerMap->$type->intern($value);
+    private function internRow($className, $fieldClassMap, $value) {
+        $result = new $className();
+
+        foreach ($value as $k => $v) {
+            $result->$k = isset($fieldClassMap[$k]) ? $this->internAny($fieldClassMap[$k], $v) : $v;
+        }
+
+        return $result;
+    }
+
+    private function internAny($class, $value) {
+        return $class === null ? $value : $this->serializerMap->$class->intern($value);
     }
 
     private function externAny($class, $value) {
@@ -169,8 +181,14 @@ class Environment {
         $data = $this->backendMap->$backendName->find($implName, $resultType, $values, $returnArray);
 
         if ($returnArray) {
-            foreach ($data as &$value) {
-                $value = $this->internAny($resultType, $value);
+            if (is_array($resultType)) {
+                foreach ($data as &$value) {
+                    $value = $this->internRow($resultType['__construct'], $resultType, $value);
+                }
+            } else {
+                foreach ($data as &$value) {
+                    $value = $this->internAny($resultType, $value);
+                }
             }
         } else {
             $data = $this->internAny($resultType, $data);
@@ -180,7 +198,7 @@ class Environment {
     }
 
     private function defineGetter(\ReflectionMethod $info) {
-        $signature = self::getSignature($info);
+        $signature = $this->getSignature($info);
 
         if (count((array)$signature->parameters) != 1) {
             throw new \Exception('getters must have one parameter');
@@ -218,7 +236,7 @@ class Environment {
     }
 
     private function defineSetter(\ReflectionMethod $info) {
-        $signature = self::getSignature($info);
+        $signature = $this->getSignature($info);
 
         if (count((array)$signature->parameters) < 2) {
             throw new \Exception('setters must have an id parameter and at least one value parameter');
@@ -255,7 +273,7 @@ class Environment {
     }
 
     private function defineFinder(\ReflectionMethod $info) {
-        $signature = self::getSignature($info);
+        $signature = $this->getSignature($info);
 
         $backendName = $this->getBackendName($signature->fullName, $signature->returnType, null);
 
@@ -300,7 +318,27 @@ class Environment {
         throw new \Exception('cannot find backend for ' . $implName . ' using ' . $idClass);
     }
 
-    private static function getSignature(\ReflectionMethod $info) {
+    private function getPropertyClass(\ReflectionProperty $prop) {
+        if (preg_match('/@var\\s+(\\S+)/', $prop->getDocComment(), $commentMatch)) {
+            $targetIdClassHint = $commentMatch[1];
+
+            // convert to full class name
+            if (array_search($targetIdClassHint, self::$PRIMITIVE_TYPES) !== FALSE) {
+                return null;
+            } elseif ($targetIdClassHint === 'object') {
+                // special object shorthand
+                return '\\stdClass';
+            } else {
+                return $targetIdClassHint[0] === '\\' ?
+                        $targetIdClassHint :
+                        $prop->getDeclaringClass()->getNamespaceName() . '\\' . $targetIdClassHint;
+            }
+        }
+
+        return null;
+    }
+
+    private function getSignature(\ReflectionMethod $info) {
         $signature = (object)array();
 
         $signature->name = $info->getName();
@@ -320,14 +358,35 @@ class Environment {
 
             $returnType = null;
 
-            if ($targetIdClassHint === 'object') {
-                $returnType = array(); // @todo this
-            } else {
-                $targetClassInfo = new \ReflectionClass($targetIdClassHint[0] === '\\' ?
-                        $targetIdClassHint :
-                        $info->getDeclaringClass()->getNamespaceName() . '\\' . $targetIdClassHint);
+            if (array_search($targetIdClassHint, self::$PRIMITIVE_TYPES) === FALSE) {
+                // convert to full class name
+                if ($targetIdClassHint === 'object') {
+                    $targetIdClassHint = 'stdClass';
+                } else {
+                    $targetIdClassHint = $targetIdClassHint[0] === '\\' ?
+                            substr($targetIdClassHint, 1) :
+                            $info->getDeclaringClass()->getNamespaceName() . '\\' . $targetIdClassHint;
+                }
 
-                $returnType = $targetClassInfo->getName();
+                $targetClassInfo = new \ReflectionClass($targetIdClassHint);
+
+                if (isset($this->serializerMap->$targetIdClassHint)) {
+                    $returnType = $targetClassInfo->getName();
+                } else {
+                    $returnType = array('__construct' => $targetClassInfo->getName());
+
+                    foreach ($targetClassInfo->getProperties() as $prop) {
+                        if ($prop->isStatic()) {
+                            continue;
+                        }
+
+                        if ( ! $prop->isPublic()) {
+                            throw new \Exception('row object must only contain public properties');
+                        }
+
+                        $returnType[$prop->getName()] = $this->getPropertyClass($prop);
+                    }
+                }
             }
 
             $signature->returnArray = $isArray;

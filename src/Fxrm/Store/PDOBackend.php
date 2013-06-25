@@ -35,11 +35,18 @@ abstract class PDOBackend {
 
         $stmt->closeCursor();
 
-        // model may expect object to not exist: null value is the "pure" way to communicate that
-        foreach ($rows as &$row) {
-            $row = $this->toValue($returnType, $row);
+        // process all rows in-place
+        if (is_array($returnType)) {
+            foreach ($rows as &$row) {
+                $row = $this->toRow($returnType, $row);
+            }
+        } else {
+            foreach ($rows as &$row) {
+                $row = $this->toValue($returnType, $row);
+            }
         }
 
+        // model may expect object to not exist: null value is the "pure" way to communicate that
         return $multiple ? $rows : (count($rows) === 0 ? null : $rows[0]);
     }
 
@@ -92,6 +99,16 @@ abstract class PDOBackend {
         $stmt->closeCursor();
 
         return $id;
+    }
+
+    private function toRow($fieldClassMap, $data) {
+        $result = (object)null;
+
+        foreach ($data as $k => $v) {
+            $result->$k = isset($fieldClassMap[$k]) ? $this->toValue($fieldClassMap[$k], $v) : $v;
+        }
+
+        return $result;
     }
 
     private function toValue($class, $data) {
