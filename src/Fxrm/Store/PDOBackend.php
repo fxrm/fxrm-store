@@ -104,6 +104,7 @@ abstract class PDOBackend {
     private function toRow($fieldClassMap, $data) {
         $result = (object)null;
 
+        // permissively copying all fields, including those with unknown types
         foreach ($data as $k => $v) {
             $result->$k = isset($fieldClassMap[$k]) ? $this->toValue($fieldClassMap[$k], $v) : $v;
         }

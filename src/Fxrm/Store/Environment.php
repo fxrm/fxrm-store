@@ -36,6 +36,8 @@ class Environment {
             $this->serializerMap->$valueClass = new ValueSerializer($valueClass);
         }
 
+        $this->serializerMap->DateTime = new PassthroughSerializer();
+
         // copy over the method backend names
         // @todo verify names
         $this->methodMap = (object)array();
@@ -132,8 +134,9 @@ class Environment {
     private function internRow($className, $fieldClassMap, $value) {
         $result = new $className();
 
-        foreach ($value as $k => $v) {
-            $result->$k = isset($fieldClassMap[$k]) ? $this->internAny($fieldClassMap[$k], $v) : $v;
+        // copying strictly only the defined properties
+        foreach ($fieldClassMap as $k => $class) {
+            $result->$k = $this->internAny($class, $value->$k);
         }
 
         return $result;
@@ -182,8 +185,13 @@ class Environment {
 
         if ($returnArray) {
             if (is_array($resultType)) {
+                $rowClass = $resultType['__construct'];
+
+                $fieldClassMap = $resultType;
+                unset($fieldClassMap['__construct']);
+
                 foreach ($data as &$value) {
-                    $value = $this->internRow($resultType['__construct'], $resultType, $value);
+                    $value = $this->internRow($rowClass, $fieldClassMap, $value);
                 }
             } else {
                 foreach ($data as &$value) {
@@ -330,7 +338,7 @@ class Environment {
                 return '\\stdClass';
             } else {
                 return $targetIdClassHint[0] === '\\' ?
-                        $targetIdClassHint :
+                        substr($targetIdClassHint, 1) :
                         $prop->getDeclaringClass()->getNamespaceName() . '\\' . $targetIdClassHint;
             }
         }
