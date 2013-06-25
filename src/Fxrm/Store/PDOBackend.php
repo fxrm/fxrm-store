@@ -11,8 +11,18 @@ abstract class PDOBackend {
         $this->pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
     }
 
-    function find($method, $entity, $valueMap, $multiple) {
-        $stmt = $this->pdo->prepare($this->getCustomQuery($method) ?: $this->generateFindQuery($this->getEntityName($entity), array_keys($valueMap), $multiple));
+    function find($method, $returnType, $valueMap, $multiple) {
+        $query = $this->getCustomQuery($method);
+
+        if ( ! $query) {
+            if ($returnType === null || is_array($returnType)) {
+                throw new \Exception('return type is not an identity: ' . var_export($returnType, true));
+            }
+
+            $query = $this->generateFindQuery($this->getEntityName($returnType), array_keys($valueMap), $multiple);
+        }
+
+        $stmt = $this->pdo->prepare($query);
 
         foreach ($valueMap as $field => $value) {
             $stmt->bindValue(':' . $field, $this->fromValue($value));
@@ -21,12 +31,16 @@ abstract class PDOBackend {
         $stmt->execute();
 
         // if specific entity requested, only return the first column, assumed to contain the ID
-        $rows = is_array($entity) ? $stmt->fetchAll(\PDO::FETCH_OBJ) : $stmt->fetchAll(\PDO::FETCH_COLUMN, 0);
+        $rows = is_array($returnType) ? $stmt->fetchAll(\PDO::FETCH_OBJ) : $stmt->fetchAll(\PDO::FETCH_COLUMN, 0);
 
         $stmt->closeCursor();
 
         // model may expect object to not exist: null value is the "pure" way to communicate that
-        return $this->toValue($entity, $multiple ? $rows : (count($rows) === 0 ? null : (string)$rows[0]), true);
+        foreach ($rows as &$row) {
+            $row = $this->toValue($returnType, $row);
+        }
+
+        return $multiple ? $rows : (count($rows) === 0 ? null : $rows[0]);
     }
 
     function get($method, $entity, $id, $hintClass, $field) {
@@ -47,7 +61,7 @@ abstract class PDOBackend {
             throw new \Exception('object not found');
         }
 
-        return $this->toValue($hintClass, $rows[0], false);
+        return $this->toValue($hintClass, $rows[0]);
     }
 
     function set($method, $entity, $id, $valueMap) {
@@ -80,16 +94,8 @@ abstract class PDOBackend {
         return $id;
     }
 
-    private function toValue($class, $data, $isArray) {
+    private function toValue($class, $data) {
         if ($class === 'DateTime') {
-            if ($isArray) {
-                foreach ($data as &$v) {
-                    $v = $this->internDateTime($v);
-                }
-
-                return $data;
-            }
-
             return $this->internDateTime($data);
         }
 
