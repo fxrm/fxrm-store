@@ -3,6 +3,8 @@
 namespace Fxrm\Store;
 
 abstract class Backend {
+    const DATE_TIME_TYPE = '03e38550-dd54-11e2-a28f-0800200c9a66';
+
     abstract function find($method, $entity, $valueMap, $returnType, $multiple);
 
     abstract function get($method, $entity, $id, $fieldType, $field);

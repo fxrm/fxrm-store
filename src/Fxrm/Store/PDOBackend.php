@@ -103,7 +103,7 @@ abstract class PDOBackend extends Backend {
     }
 
     private function toValue($type, $data) {
-        if ($type === 'DATE_TIME') {
+        if ($type === Backend::DATE_TIME_TYPE) {
             return $this->internDateTime($data);
         }
 

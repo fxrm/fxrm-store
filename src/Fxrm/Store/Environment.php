@@ -331,7 +331,7 @@ class Environment {
     }
 
     private function getBackendType($class) {
-        return $class === 'DateTime' ? 'DATE_TIME' : null;
+        return $class === 'DateTime' ? Backend::DATE_TIME_TYPE : null;
     }
 
     private function getBackendTypeMap($classMap) {
