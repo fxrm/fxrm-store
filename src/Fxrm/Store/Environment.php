@@ -172,7 +172,7 @@ class Environment {
         $this->backendMap->$backendName->set($implName, $idClass, $id, $values);
     }
 
-    function find($backendName, $implName, $resultType, $properties, $returnArray) {
+    function find($backendName, $implName, $returnClass, $fieldClassMap, $properties, $returnArray) {
         $values = array();
 
         foreach ($properties as $propertyName => $qualifiedValue) {
@@ -181,25 +181,24 @@ class Environment {
             $values[$propertyName] = $this->externAny($propertyClass, $value);
         }
 
-        $data = $this->backendMap->$backendName->find($implName, $resultType, $values, $returnArray);
+        $data = $this->backendMap->$backendName->find($implName, $fieldClassMap ? $fieldClassMap : $returnClass, $values, $returnArray);
 
         if ($returnArray) {
-            if (is_array($resultType)) {
-                $rowClass = $resultType['__construct'];
-
-                $fieldClassMap = $resultType;
-                unset($fieldClassMap['__construct']);
-
+            if ($fieldClassMap) {
                 foreach ($data as &$value) {
-                    $value = $this->internRow($rowClass, $fieldClassMap, $value);
+                    $value = $this->internRow($returnClass, $fieldClassMap, $value);
                 }
             } else {
                 foreach ($data as &$value) {
-                    $value = $this->internAny($resultType, $value);
+                    $value = $this->internAny($returnClass, $value);
                 }
             }
         } else {
-            $data = $this->internAny($resultType, $data);
+            if ($fieldClassMap) {
+                $data = $this->internRow($returnClass, $fieldClassMap, $data);
+            } else {
+                $data = $this->internAny($returnClass, $data);
+            }
         }
 
         return $data;
@@ -212,8 +211,8 @@ class Environment {
             throw new \Exception('getters must have one parameter');
         }
 
-        if ($signature->returnArray) {
-            throw new \Exception('getters cannot return arrays');
+        if ($signature->returnArray || $signature->returnFieldMap) {
+            throw new \Exception('getters cannot return arrays or row objects');
         }
 
         if ( ! preg_match('/([^\\\\]+)Id$/', $signature->firstParameterClass, $idMatch)) {
@@ -290,6 +289,7 @@ class Environment {
         $source[] = var_export($backendName, true) . ', ';
         $source[] = var_export($signature->fullName, true) . ', ';
         $source[] = var_export($signature->returnType, true) . ', ';
+        $source[] = var_export($signature->returnFieldMap, true) . ', ';
         $source[] = 'array(';
 
         $count = 0;
@@ -370,15 +370,13 @@ class Environment {
 
             $targetIdClass = $this->getRealClass($info->getDeclaringClass(), $targetIdClassHint);
 
-            $returnType = null;
+            $fieldMap = null;
 
             if ($targetIdClass !== null) {
                 $targetClassInfo = new \ReflectionClass($targetIdClass);
 
-                if (isset($this->serializerMap->$targetIdClass)) {
-                    $returnType = $targetClassInfo->getName();
-                } else {
-                    $returnType = array('__construct' => $targetClassInfo->getName());
+                if ( ! isset($this->serializerMap->$targetIdClass)) {
+                    $fieldMap = array();
 
                     foreach ($targetClassInfo->getProperties() as $prop) {
                         if ($prop->isStatic()) {
@@ -389,16 +387,18 @@ class Environment {
                             throw new \Exception('row object must only contain public properties');
                         }
 
-                        $returnType[$prop->getName()] = $this->getPropertyClass($prop);
+                        $fieldMap[$prop->getName()] = $this->getPropertyClass($prop);
                     }
                 }
             }
 
             $signature->returnArray = $isArray;
-            $signature->returnType = $returnType;
+            $signature->returnType = $targetIdClass;
+            $signature->returnFieldMap = $fieldMap;
         } else {
             $signature->returnArray = false;
             $signature->returnType = null;
+            $signature->returnFieldMap = null;
         }
 
         $signature->parameters = (object)array();
