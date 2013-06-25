@@ -2,92 +2,23 @@
 
 namespace Fxrm\Store;
 
-class SQLiteBackend {
-    function __construct($dsn) {
-        $this->pdo = new \PDO($dsn);
-
-        $this->pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+class SQLiteBackend extends PDOBackend {
+    protected function getImplementationNamespace() {
+        return 'sqlite';
     }
 
-    function find($method, $entity, $valueMap, $multiple) {
-        $stmt = $this->pdo->prepare($this->getCustomQuery($method) ?: $this->generateFindQuery($entity, array_keys($valueMap), $multiple));
-
-        foreach ($valueMap as $field => $value) {
-            $stmt->bindValue(':' . $field, $this->fromValue($value));
-        }
-
-        $stmt->execute();
-
-        // if specific entity requested, only return the first column, assumed to contain the ID
-        $rows = $entity === null ? $stmt->fetchAll(\PDO::FETCH_OBJ) : $stmt->fetchAll(\PDO::FETCH_COLUMN, 0);
-
-        $stmt->closeCursor();
-
-        // model may expect object to not exist: null value is the "pure" way to communicate that
-        return $multiple ? $rows : (count($rows) === 0 ? null : (string)$rows[0]);
+    protected function externDateTime(\DateTime $value) {
+        // Unix timestamp
+        return $value->getTimestamp();
     }
 
-    function get($method, $entity, $id, $hintClass, $field) {
-        // @todo use the original model parameter name as query param
-        $sql = $this->getCustomQuery($method) ?: $this->generateGetQuery($entity, $field);
-
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->bindValue(':id', (int)$id);
-        $stmt->execute();
-
-        // expecting only a single value per row
-        $rows = $stmt->fetchAll(\PDO::FETCH_COLUMN, 0);
-
-        $stmt->closeCursor();
-
-        // object is expected to exist; this exception is not caught by model logic
-        if (count($rows) !== 1) {
-            throw new \Exception('object not found');
-        }
-
-        return $hintClass === 'DateTime' ? new \DateTime('@' . $rows[0]) : $rows[0];
+    protected function internDateTime($data) {
+        // Unix timestamp
+        return new \DateTime('@' . (int)$data);
     }
 
-    function set($method, $entity, $id, $valueMap) {
-        // @todo use the original model parameter name as query param
-        $stmt = $this->pdo->prepare($this->getCustomQuery($method) ?: $this->generateSetQuery($entity, array_keys($valueMap)));
-        $stmt->bindValue(':id', (int)$id);
-
-        $valueCount = 0;
-        foreach ($valueMap as $field => $value) {
-            $stmt->bindValue(':' . $field, $this->fromValue($value));
-            $valueCount += 1;
-        }
-
-        $stmt->execute();
-
-        if ($stmt->rowCount() !== 1) {
-            throw new \Exception('did not update exactly one row');
-        }
-
-        $stmt->closeCursor();
-    }
-
-    function create($entity) {
-        $stmt = $this->pdo->prepare($this->generateCreateQuery($entity));
-        $stmt->execute();
-        $id = $this->pdo->lastInsertId();
-
-        $stmt->closeCursor();
-
-        return $id;
-    }
-
-    private function fromValue($value) {
-        if ($value instanceof \DateTime) {
-            return $value->getTimestamp();
-        }
-
-        return $value;
-    }
-
-    private function generateFindQuery($entity, $fieldList, $multiple) {
-        $sql[] = 'SELECT ROWID AS id FROM "' . $this->getTableName($entity) . '" WHERE ';
+    protected function generateFindQuery($entity, $fieldList, $multiple) {
+        $sql[] = 'SELECT ROWID AS id FROM "' . $entity . '" WHERE ';
 
         foreach ($fieldList as $i => $field) {
             if ($i > 0) {
@@ -108,12 +39,12 @@ class SQLiteBackend {
         return join('', $sql);
     }
 
-    private function generateGetQuery($entity, $field) {
-        return 'SELECT "' . $field . '" AS v FROM "' . $this->getTableName($entity) . '" WHERE ROWID = :id LIMIT 1';
+    protected function generateGetQuery($entity, $field) {
+        return 'SELECT "' . $field . '" AS v FROM "' . $entity . '" WHERE ROWID = :id LIMIT 1';
     }
 
-    private function generateSetQuery($entity, $fieldList) {
-        $sql[] = 'UPDATE "' . $this->getTableName($entity) . '" SET ';
+    protected function generateSetQuery($entity, $fieldList) {
+        $sql[] = 'UPDATE "' . $entity . '" SET ';
 
         foreach ($fieldList as $i => $field) {
             if ($i > 0) {
@@ -128,30 +59,8 @@ class SQLiteBackend {
         return join('', $sql);
     }
 
-    private function generateCreateQuery($entity) {
-        return 'INSERT INTO "' . $this->getTableName($entity) . '" (ROWID) VALUES (NULL)';
-    }
-
-    private function getTableName($idClass) {
-        if ( ! preg_match('/([^\\\\]+)Id$/', $idClass, $idMatch)) {
-            throw new \Exception('entity class must be an identity: ' . $idClass);
-        }
-
-        return $idMatch[1];
-    }
-
-    private function getCustomQuery($fullName) {
-        $segments = explode('\\', $fullName);
-
-        $memberName = array_pop($segments);
-
-        $classShortName = array_pop($segments);
-        $segments[] = 'sqlite';
-        $segments[] = $classShortName . 'SQL';
-        $className = join('\\', $segments);
-
-        $sqlConstantName = "$className::$memberName";
-        return defined($sqlConstantName) ? constant($sqlConstantName) : null;
+    protected function generateCreateQuery($entity) {
+        return 'INSERT INTO "' . $entity . '" (ROWID) VALUES (NULL)';
     }
 }
 
