@@ -186,7 +186,7 @@ class Environment {
             throw new \Exception('getters must have one parameter');
         }
 
-        if (property_exists($signature, 'returnArrayType')) {
+        if ($signature->returnArray) {
             throw new \Exception('getters cannot return arrays');
         }
 
@@ -257,16 +257,13 @@ class Environment {
     private function defineFinder(\ReflectionMethod $info) {
         $signature = self::getSignature($info);
 
-        $isArray = property_exists($signature, 'returnArrayType');
-        $returnType = $isArray ? $signature->returnArrayType : $signature->returnType;
-
-        $backendName = $this->getBackendName($signature->fullName, $returnType, null);
+        $backendName = $this->getBackendName($signature->fullName, $signature->returnType, null);
 
         $source[] = $signature->preamble . ' {';
         $source[] = 'return $this->s->find(';
         $source[] = var_export($backendName, true) . ', ';
         $source[] = var_export($signature->fullName, true) . ', ';
-        $source[] = var_export($returnType, true) . ', ';
+        $source[] = var_export($signature->returnType, true) . ', ';
         $source[] = 'array(';
 
         $count = 0;
@@ -281,7 +278,7 @@ class Environment {
         }
 
         $source[] = '),';
-        $source[] = $isArray ? 'true' : 'false';
+        $source[] = $signature->returnArray ? 'true' : 'false';
         $source[] = ');';
         $source[] = '}';
 
@@ -333,12 +330,10 @@ class Environment {
                 $returnType = $targetClassInfo->getName();
             }
 
-            if ($isArray) {
-                $signature->returnArrayType = $returnType;
-            } else {
-                $signature->returnType = $returnType;
-            }
+            $signature->returnArray = $isArray;
+            $signature->returnType = $returnType;
         } else {
+            $signature->returnArray = false;
             $signature->returnType = null;
         }
 
