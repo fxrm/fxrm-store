@@ -6,8 +6,8 @@ namespace Fxrm\Store;
 class Environment {
     private $backendMap;
     private $serializerMap;
-
-    private $defaultBackend;
+    private $idClassMap;
+    private $methodMap;
 
     function __construct($configPath) {
         $config = json_decode(file_get_contents($configPath));
@@ -20,17 +20,26 @@ class Environment {
             $this->backendMap->$backendName = $backendClass->newInstanceArgs($backendArgs);
         }
 
-        $this->defaultBackend = $this->backendMap->{$config->defaultBackend};
-
         // set up serializers
+        // @todo verify names
         $this->serializerMap = (object)array();
+        $this->idClassMap = (object)array();
 
         foreach ($config->idClasses as $idClass => $backendName) {
+            $this->idClassMap->$idClass = $backendName;
             $this->serializerMap->$idClass = new IdentitySerializer($idClass, $this->backendMap->$backendName);
         }
 
         foreach ($config->valueClasses as $valueClass) {
             $this->serializerMap->$valueClass = new ValueSerializer($valueClass);
+        }
+
+        // copy over the method backend names
+        // @todo verify names
+        $this->methodMap = (object)array();
+
+        foreach ($config->methods as $method => $backendName) {
+            $this->methodMap->$method = $backendName;
         }
     }
 
@@ -77,11 +86,11 @@ class Environment {
             $name = $methodInfo->getName();
 
             if (substr($name, 0, 3) === 'get') {
-                $implementationSource[] = self::defineGetter($methodInfo);
+                $implementationSource[] = $this->defineGetter($methodInfo);
             } elseif (substr($name, 0, 4) === 'find') {
-                $implementationSource[] = self::defineFinder($methodInfo);
+                $implementationSource[] = $this->defineFinder($methodInfo);
             } else {
-                $implementationSource[] = self::defineSetter($methodInfo);
+                $implementationSource[] = $this->defineSetter($methodInfo);
             }
         }
 
@@ -126,19 +135,15 @@ class Environment {
         return $class === null ? $value : $this->serializerMap->$class->extern($value);
     }
 
-    private function getBackend($implName) {
-        return $this->defaultBackend;
-    }
-
-    function get($implName, $idClass, $idObj, $propertyClass, $propertyName) {
+    function get($backendName, $implName, $idClass, $idObj, $propertyClass, $propertyName) {
         $id = $this->externAny($idClass, $idObj);
 
-        $value = $this->getBackend($implName)->get($implName, $idClass, $id, $propertyClass, $propertyName);
+        $value = $this->backendMap->$backendName->get($implName, $idClass, $id, $propertyClass, $propertyName);
 
         return $this->internAny($propertyClass, $value);
     }
 
-    function set($implName, $idClass, $idObj, $properties) {
+    function set($backendName, $implName, $idClass, $idObj, $properties) {
         $id = $this->externAny($idClass, $idObj);
 
         $values = array();
@@ -149,10 +154,10 @@ class Environment {
             $values[$propertyName] = $this->externAny($propertyClass, $value);
         }
 
-        $this->getBackend($implName)->set($implName, $idClass, $id, $values);
+        $this->backendMap->$backendName->set($implName, $idClass, $id, $values);
     }
 
-    function find($implName, $idClass, $properties, $returnArray) {
+    function find($backendName, $implName, $idClass, $properties, $returnArray) {
         $values = array();
 
         foreach ($properties as $propertyName => $qualifiedValue) {
@@ -161,7 +166,7 @@ class Environment {
             $values[$propertyName] = $this->externAny($propertyClass, $value);
         }
 
-        $data = $this->getBackend($implName)->find($implName, $idClass, $values, $returnArray);
+        $data = $this->backendMap->$backendName->find($implName, $idClass, $values, $returnArray);
 
         if ($returnArray) {
             foreach ($data as &$value) {
@@ -174,7 +179,7 @@ class Environment {
         return $data;
     }
 
-    private static function defineGetter(\ReflectionMethod $info) {
+    private function defineGetter(\ReflectionMethod $info) {
         $signature = self::getSignature($info);
 
         if (count((array)$signature->parameters) != 1) {
@@ -191,28 +196,35 @@ class Environment {
             throw new \Exception('getter must include target class name: ' . $fullPrefix);
         }
 
+        $propertyName = lcfirst(substr($info->getName(), strlen($fullPrefix)));
+        $backendName = $this->getBackendName($signature->fullName, $signature->firstParameterClass, $propertyName);
+
         $source[] = $signature->preamble . ' {';
         $source[] = 'return $this->s->get(';
+        $source[] = var_export($backendName, true) . ', ';
         $source[] = var_export($signature->fullName, true) . ', ';
         $source[] = var_export($signature->firstParameterClass, true) . ', ';
         $source[] = '$a0, ';
         $source[] = var_export($signature->returnClass, true) . ', ';
-        $source[] = var_export(lcfirst(substr($info->getName(), strlen($fullPrefix))), true);
+        $source[] = var_export($propertyName, true);
         $source[] = ');';
         $source[] = '}';
 
         return join('', $source);
     }
 
-    private static function defineSetter(\ReflectionMethod $info) {
+    private function defineSetter(\ReflectionMethod $info) {
         $signature = self::getSignature($info);
 
         if (count((array)$signature->parameters) < 2) {
             throw new \Exception('setters must have an id parameter and at least one value parameter');
         }
 
+        $backendName = $this->getBackendName($signature->fullName, $signature->firstParameterClass, $signature->firstParameterName);
+
         $source[] = $signature->preamble . ' {';
         $source[] = '$this->s->set(';
+        $source[] = var_export($backendName, true) . ', ';
         $source[] = var_export($signature->fullName, true) . ', ';
         $source[] = var_export($signature->firstParameterClass, true) . ', ';
         $source[] = '$a0, ';
@@ -238,15 +250,19 @@ class Environment {
         return join('', $source);
     }
 
-    private static function defineFinder(\ReflectionMethod $info) {
+    private function defineFinder(\ReflectionMethod $info) {
         $signature = self::getSignature($info);
 
         $isArray = property_exists($signature, 'returnArrayClass');
+        $returnClass = $isArray ? $signature->returnArrayClass : $signature->returnClass;
+
+        $backendName = $this->getBackendName($signature->fullName, $returnClass, null);
 
         $source[] = $signature->preamble . ' {';
         $source[] = 'return $this->s->find(';
+        $source[] = var_export($backendName, true) . ', ';
         $source[] = var_export($signature->fullName, true) . ', ';
-        $source[] = var_export($isArray ? $signature->returnArrayClass : $signature->returnClass, true) . ', ';
+        $source[] = var_export($returnClass, true) . ', ';
         $source[] = 'array(';
 
         $count = 0;
@@ -266,6 +282,21 @@ class Environment {
         $source[] = '}';
 
         return join('', $source);
+    }
+
+    private function getBackendName($implName, $idClass, $firstPropertyName) {
+        // see if explicit backend designation is set
+        if (property_exists($this->methodMap, $implName)) {
+            return $this->methodMap->$implName;
+        }
+
+        // otherwise, use the identity class
+        // @todo also consider property name
+        if (property_exists($this->idClassMap, $idClass)) {
+            return $this->idClassMap->$idClass;
+        }
+
+        throw new \Exception('cannot find backend for ' . $implName . ' using ' . $idClass);
     }
 
     private static function getSignature(\ReflectionMethod $info) {
@@ -316,6 +347,7 @@ class Environment {
         $count = 0;
         foreach ($signature->parameters as $param => $class) {
             if ($count === 0) {
+                $signature->firstParameterName = $param;
                 $signature->firstParameterClass = $class;
             }
 
