@@ -11,18 +11,8 @@ abstract class PDOBackend {
         $this->pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
     }
 
-    function find($method, $returnType, $valueMap, $multiple) {
-        $query = $this->getCustomQuery($method);
-
-        if ( ! $query) {
-            if ($returnType === null || is_array($returnType)) {
-                throw new \Exception('return type is not an identity: ' . var_export($returnType, true));
-            }
-
-            $query = $this->generateFindQuery($this->getEntityName($returnType), array_keys($valueMap), $multiple);
-        }
-
-        $stmt = $this->pdo->prepare($query);
+    function find($method, $entity, $valueMap, $returnType, $multiple) {
+        $stmt = $this->pdo->prepare($this->getCustomQuery($method) ?: $this->generateFindQuery($this->getEntityName($entity), array_keys($valueMap), $multiple));
 
         foreach ($valueMap as $field => $value) {
             $stmt->bindValue(':' . $field, $this->fromValue($value));
@@ -50,7 +40,7 @@ abstract class PDOBackend {
         return $multiple ? $rows : (count($rows) === 0 ? null : $rows[0]);
     }
 
-    function get($method, $entity, $id, $hintClass, $field) {
+    function get($method, $entity, $id, $fieldType, $field) {
         // @todo use the original model parameter name as query param
         $sql = $this->getCustomQuery($method) ?: $this->generateGetQuery($this->getEntityName($entity), $field);
 
@@ -68,7 +58,7 @@ abstract class PDOBackend {
             throw new \Exception('object not found');
         }
 
-        return $this->toValue($hintClass, $rows[0]);
+        return $this->toValue($fieldType, $rows[0]);
     }
 
     function set($method, $entity, $id, $valueMap) {
@@ -101,19 +91,19 @@ abstract class PDOBackend {
         return $id;
     }
 
-    private function toRow($fieldClassMap, $data) {
+    private function toRow($fieldTypeMap, $data) {
         $result = (object)null;
 
         // permissively copying all fields, including those with unknown types
         foreach ($data as $k => $v) {
-            $result->$k = isset($fieldClassMap[$k]) ? $this->toValue($fieldClassMap[$k], $v) : $v;
+            $result->$k = isset($fieldTypeMap[$k]) ? $this->toValue($fieldTypeMap[$k], $v) : $v;
         }
 
         return $result;
     }
 
-    private function toValue($class, $data) {
-        if ($class === 'DateTime') {
+    private function toValue($type, $data) {
+        if ($type === 'DATE_TIME') {
             return $this->internDateTime($data);
         }
 

@@ -120,15 +120,17 @@ class Environment {
     }
 
     public function intern($className, $id) {
-        $serializer = $this->serializerMap->$className;
-
         // explicitly deal with identities only - values are not a concern
-        if (!($serializer instanceof IdentitySerializer)) {
+        if ( ! $this->isIdentityClass($className)) {
             throw new \Exception('only identities can be externalized'); // developer error
         }
 
         // explicitly deal with identities only - values are not a concern
-        return $serializer->intern($id);
+        return $this->serializerMap->$className->intern($id);
+    }
+
+    private function isIdentityClass($class) {
+        return property_exists($this->serializerMap, $class) && $this->serializerMap->$class instanceof IdentitySerializer;
     }
 
     private function internRow($className, $fieldClassMap, $value) {
@@ -153,7 +155,7 @@ class Environment {
     function get($backendName, $implName, $idClass, $idObj, $propertyClass, $propertyName) {
         $id = $this->externAny($idClass, $idObj);
 
-        $value = $this->backendMap->$backendName->get($implName, $idClass, $id, $propertyClass, $propertyName);
+        $value = $this->backendMap->$backendName->get($implName, $idClass, $id, $this->getBackendType($propertyClass), $propertyName);
 
         return $this->internAny($propertyClass, $value);
     }
@@ -181,7 +183,9 @@ class Environment {
             $values[$propertyName] = $this->externAny($propertyClass, $value);
         }
 
-        $data = $this->backendMap->$backendName->find($implName, $fieldClassMap ? $fieldClassMap : $returnClass, $values, $returnArray);
+        $idClass = $this->isIdentityClass($returnClass) ? $returnClass : null;
+
+        $data = $this->backendMap->$backendName->find($implName, $idClass, $values, $fieldClassMap ? $this->getBackendTypeMap($fieldClassMap) : $this->getBackendType($returnClass), $returnArray);
 
         if ($returnArray) {
             if ($fieldClassMap) {
@@ -324,6 +328,14 @@ class Environment {
         }
 
         throw new \Exception('cannot find backend for ' . $implName . ' using ' . $idClass);
+    }
+
+    private function getBackendType($class) {
+        return $class === 'DateTime' ? 'DATE_TIME' : null;
+    }
+
+    private function getBackendTypeMap($classMap) {
+        return array_map(array($this, 'getBackendType'), $classMap);
     }
 
     private function getRealClass(\ReflectionClass $declaringClass, $classHint) {
