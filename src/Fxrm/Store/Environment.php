@@ -127,8 +127,8 @@ class Environment {
         return $serializer->intern($id);
     }
 
-    private function internAny($class, $value) {
-        return $class === null ? $value : $this->serializerMap->$class->intern($value);
+    private function internAny($type, $value) {
+        return ($type === null || is_array($type)) ? $value : $this->serializerMap->$type->intern($value);
     }
 
     private function externAny($class, $value) {
@@ -157,7 +157,7 @@ class Environment {
         $this->backendMap->$backendName->set($implName, $idClass, $id, $values);
     }
 
-    function find($backendName, $implName, $idClass, $properties, $returnArray) {
+    function find($backendName, $implName, $resultType, $properties, $returnArray) {
         $values = array();
 
         foreach ($properties as $propertyName => $qualifiedValue) {
@@ -166,14 +166,14 @@ class Environment {
             $values[$propertyName] = $this->externAny($propertyClass, $value);
         }
 
-        $data = $this->backendMap->$backendName->find($implName, $idClass, $values, $returnArray);
+        $data = $this->backendMap->$backendName->find($implName, $resultType, $values, $returnArray);
 
         if ($returnArray) {
             foreach ($data as &$value) {
-                $value = $this->internAny($idClass, $value);
+                $value = $this->internAny($resultType, $value);
             }
         } else {
-            $data = $this->internAny($idClass, $data);
+            $data = $this->internAny($resultType, $data);
         }
 
         return $data;
@@ -184,6 +184,10 @@ class Environment {
 
         if (count((array)$signature->parameters) != 1) {
             throw new \Exception('getters must have one parameter');
+        }
+
+        if (property_exists($signature, 'returnArrayType')) {
+            throw new \Exception('getters cannot return arrays');
         }
 
         if ( ! preg_match('/([^\\\\]+)Id$/', $signature->firstParameterClass, $idMatch)) {
@@ -205,7 +209,7 @@ class Environment {
         $source[] = var_export($signature->fullName, true) . ', ';
         $source[] = var_export($signature->firstParameterClass, true) . ', ';
         $source[] = '$a0, ';
-        $source[] = var_export($signature->returnClass, true) . ', ';
+        $source[] = var_export($signature->returnType, true) . ', ';
         $source[] = var_export($propertyName, true);
         $source[] = ');';
         $source[] = '}';
@@ -253,16 +257,16 @@ class Environment {
     private function defineFinder(\ReflectionMethod $info) {
         $signature = self::getSignature($info);
 
-        $isArray = property_exists($signature, 'returnArrayClass');
-        $returnClass = $isArray ? $signature->returnArrayClass : $signature->returnClass;
+        $isArray = property_exists($signature, 'returnArrayType');
+        $returnType = $isArray ? $signature->returnArrayType : $signature->returnType;
 
-        $backendName = $this->getBackendName($signature->fullName, $returnClass, null);
+        $backendName = $this->getBackendName($signature->fullName, $returnType, null);
 
         $source[] = $signature->preamble . ' {';
         $source[] = 'return $this->s->find(';
         $source[] = var_export($backendName, true) . ', ';
         $source[] = var_export($signature->fullName, true) . ', ';
-        $source[] = var_export($returnClass, true) . ', ';
+        $source[] = var_export($returnType, true) . ', ';
         $source[] = 'array(';
 
         $count = 0;
@@ -317,23 +321,25 @@ class Environment {
                 $targetIdClassHint = substr($targetIdClassHint, 0, -2);
             }
 
-            $elementClass = null;
+            $returnType = null;
 
-            if ($targetIdClassHint !== 'object') {
+            if ($targetIdClassHint === 'object') {
+                $returnType = array(); // @todo this
+            } else {
                 $targetClassInfo = new \ReflectionClass($targetIdClassHint[0] === '\\' ?
                         $targetIdClassHint :
                         $info->getDeclaringClass()->getNamespaceName() . '\\' . $targetIdClassHint);
 
-                $elementClass = $targetClassInfo->getName();
+                $returnType = $targetClassInfo->getName();
             }
 
             if ($isArray) {
-                $signature->returnArrayClass = $elementClass;
+                $signature->returnArrayType = $returnType;
             } else {
-                $signature->returnClass = $elementClass;
+                $signature->returnType = $returnType;
             }
         } else {
-            $signature->returnClass = null;
+            $signature->returnType = null;
         }
 
         $signature->parameters = (object)array();

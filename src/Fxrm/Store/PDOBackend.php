@@ -21,7 +21,7 @@ abstract class PDOBackend {
         $stmt->execute();
 
         // if specific entity requested, only return the first column, assumed to contain the ID
-        $rows = $entity === null ? $stmt->fetchAll(\PDO::FETCH_OBJ) : $stmt->fetchAll(\PDO::FETCH_COLUMN, 0);
+        $rows = is_array($entity) ? $stmt->fetchAll(\PDO::FETCH_OBJ) : $stmt->fetchAll(\PDO::FETCH_COLUMN, 0);
 
         $stmt->closeCursor();
 
