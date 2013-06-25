@@ -2,7 +2,7 @@
 
 namespace Fxrm\Store;
 
-abstract class PDOBackend {
+abstract class PDOBackend extends Backend {
     private $pdo;
 
     function __construct($dsn) {
@@ -11,7 +11,7 @@ abstract class PDOBackend {
         $this->pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
     }
 
-    function find($method, $entity, $valueMap, $returnType, $multiple) {
+    final function find($method, $entity, $valueMap, $returnType, $multiple) {
         $stmt = $this->pdo->prepare($this->getCustomQuery($method) ?: $this->generateFindQuery($this->getEntityName($entity), array_keys($valueMap), $multiple));
 
         foreach ($valueMap as $field => $value) {
@@ -40,7 +40,7 @@ abstract class PDOBackend {
         return $multiple ? $rows : (count($rows) === 0 ? null : $rows[0]);
     }
 
-    function get($method, $entity, $id, $fieldType, $field) {
+    final function get($method, $entity, $id, $fieldType, $field) {
         // @todo use the original model parameter name as query param
         $sql = $this->getCustomQuery($method) ?: $this->generateGetQuery($this->getEntityName($entity), $field);
 
@@ -61,7 +61,7 @@ abstract class PDOBackend {
         return $this->toValue($fieldType, $rows[0]);
     }
 
-    function set($method, $entity, $id, $valueMap) {
+    final function set($method, $entity, $id, $valueMap) {
         // @todo use the original model parameter name as query param
         $stmt = $this->pdo->prepare($this->getCustomQuery($method) ?: $this->generateSetQuery($this->getEntityName($entity), array_keys($valueMap)));
         $stmt->bindValue(':id', (int)$id);
@@ -81,7 +81,7 @@ abstract class PDOBackend {
         $stmt->closeCursor();
     }
 
-    function create($entity) {
+    final function create($entity) {
         $stmt = $this->pdo->prepare($this->generateCreateQuery($this->getEntityName($entity)));
         $stmt->execute();
         $id = $this->pdo->lastInsertId();
