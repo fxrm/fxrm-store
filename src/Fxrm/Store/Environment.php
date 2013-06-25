@@ -326,21 +326,25 @@ class Environment {
         throw new \Exception('cannot find backend for ' . $implName . ' using ' . $idClass);
     }
 
+    private function getRealClass(\ReflectionClass $declaringClass, $classHint) {
+        // convert to full class name
+        if (array_search($classHint, self::$PRIMITIVE_TYPES) !== FALSE) {
+            return null;
+        } elseif ($classHint === 'object') {
+            // special object shorthand
+            return '\\stdClass';
+        } else {
+            return $classHint[0] === '\\' ?
+                substr($classHint, 1) :
+                $declaringClass->getNamespaceName() . '\\' . $classHint;
+        }
+    }
+
     private function getPropertyClass(\ReflectionProperty $prop) {
         if (preg_match('/@var\\s+(\\S+)/', $prop->getDocComment(), $commentMatch)) {
             $targetIdClassHint = $commentMatch[1];
 
-            // convert to full class name
-            if (array_search($targetIdClassHint, self::$PRIMITIVE_TYPES) !== FALSE) {
-                return null;
-            } elseif ($targetIdClassHint === 'object') {
-                // special object shorthand
-                return '\\stdClass';
-            } else {
-                return $targetIdClassHint[0] === '\\' ?
-                        substr($targetIdClassHint, 1) :
-                        $prop->getDeclaringClass()->getNamespaceName() . '\\' . $targetIdClassHint;
-            }
+            return $this->getRealClass($prop->getDeclaringClass(), $targetIdClassHint);
         }
 
         return null;
@@ -364,21 +368,14 @@ class Environment {
                 $targetIdClassHint = substr($targetIdClassHint, 0, -2);
             }
 
+            $targetIdClass = $this->getRealClass($info->getDeclaringClass(), $targetIdClassHint);
+
             $returnType = null;
 
-            if (array_search($targetIdClassHint, self::$PRIMITIVE_TYPES) === FALSE) {
-                // convert to full class name
-                if ($targetIdClassHint === 'object') {
-                    $targetIdClassHint = 'stdClass';
-                } else {
-                    $targetIdClassHint = $targetIdClassHint[0] === '\\' ?
-                            substr($targetIdClassHint, 1) :
-                            $info->getDeclaringClass()->getNamespaceName() . '\\' . $targetIdClassHint;
-                }
+            if ($targetIdClass !== null) {
+                $targetClassInfo = new \ReflectionClass($targetIdClass);
 
-                $targetClassInfo = new \ReflectionClass($targetIdClassHint);
-
-                if (isset($this->serializerMap->$targetIdClassHint)) {
+                if (isset($this->serializerMap->$targetIdClass)) {
                     $returnType = $targetClassInfo->getName();
                 } else {
                     $returnType = array('__construct' => $targetClassInfo->getName());
