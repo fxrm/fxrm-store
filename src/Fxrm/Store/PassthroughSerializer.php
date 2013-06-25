@@ -2,7 +2,7 @@
 
 namespace Fxrm\Store;
 
-class PassthroughSerializer {
+class PassthroughSerializer implements Serializer {
     function extern($obj) {
         return $obj;
     }

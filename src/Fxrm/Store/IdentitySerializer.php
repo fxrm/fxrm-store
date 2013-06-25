@@ -2,7 +2,7 @@
 
 namespace Fxrm\Store;
 
-class IdentitySerializer {
+class IdentitySerializer implements Serializer {
     private $className;
     private $toString, $fromString;
     private $backend;

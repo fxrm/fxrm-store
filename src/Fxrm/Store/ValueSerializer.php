@@ -2,7 +2,7 @@
 
 namespace Fxrm\Store;
 
-class ValueSerializer {
+class ValueSerializer implements Serializer {
     private $class;
 
     function __construct($class) {
