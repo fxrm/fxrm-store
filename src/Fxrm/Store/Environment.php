@@ -111,7 +111,7 @@ class Environment {
      * @param mixed $obj ideninty object to export
      * @return string representation of the identity object
      */
-    public function extern($obj) {
+    public function export($obj) {
         return $this->store->extern($obj);
     }
 
@@ -123,7 +123,7 @@ class Environment {
      * @param string $id external identifier string
      * @return mixed identity object instance
      */
-    public function intern($className, $id) {
+    public function import($className, $id) {
         return $this->store->intern($className, $id);
     }
 
