@@ -16,13 +16,11 @@ class EnvironmentStore {
     private $idClassMap;
     private $methodMap;
 
-    function __construct($configPath) {
-        $config = json_decode(file_get_contents($configPath));
-
+    function __construct($backends, $idClasses, $valueClasses, $methods) {
         // set up backends
         $this->backendMap = (object)array();
 
-        foreach ($config->backends as $backendName => $backendArgs) {
+        foreach ($backends as $backendName => $backendArgs) {
             $backendClass = new \ReflectionClass(array_shift($backendArgs));
             $this->backendMap->$backendName = $backendClass->newInstanceArgs($backendArgs);
         }
@@ -32,12 +30,12 @@ class EnvironmentStore {
         $this->serializerMap = (object)array();
         $this->idClassMap = (object)array();
 
-        foreach ($config->idClasses as $idClass => $backendName) {
+        foreach ($idClasses as $idClass => $backendName) {
             $this->idClassMap->$idClass = $backendName;
             $this->serializerMap->$idClass = new IdentitySerializer($idClass, $this->backendMap->$backendName);
         }
 
-        foreach ($config->valueClasses as $valueClass) {
+        foreach ($valueClasses as $valueClass) {
             $this->serializerMap->$valueClass = new ValueSerializer($valueClass);
         }
 
@@ -47,7 +45,7 @@ class EnvironmentStore {
         // @todo verify names
         $this->methodMap = (object)array();
 
-        foreach ($config->methods as $method => $backendName) {
+        foreach ($methods as $method => $backendName) {
             $this->methodMap->$method = $backendName;
         }
     }
