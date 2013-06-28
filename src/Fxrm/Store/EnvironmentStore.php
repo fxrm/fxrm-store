@@ -7,13 +7,16 @@
 
 namespace Fxrm\Store;
 
+/**
+ * Internal storage backend multiplexer.
+ */
 class EnvironmentStore {
     private $backendMap;
     private $serializerMap;
     private $idClassMap;
     private $methodMap;
 
-    public function __construct($configPath) {
+    function __construct($configPath) {
         $config = json_decode(file_get_contents($configPath));
 
         // set up backends

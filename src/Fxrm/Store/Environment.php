@@ -8,14 +8,30 @@
 namespace Fxrm\Store;
 
 // @todo if an identity class is abstract, store the real class in a field + "Class" column
+
+/**
+ * Storage environment context. Instantiate this with configuration settings and use
+ * as a factory.
+ */
 class Environment {
     private static $PRIMITIVE_TYPES = array('string', 'integer', 'int'); // @todo add more
 
-    function __construct($configPath) {
+    /**
+     * Initialize the storage environment context with implementation hints.
+     *
+     * @param string $configPath location of the JSON storage hint configuration file
+     */
+    public function __construct($configPath) {
         $this->store = new EnvironmentStore($configPath);
     }
 
-    function implement($className) {
+    /**
+     * Create an instance of given class backed by this storage context. Extra constructor arguments can be specified following the class name.
+     *
+     * @param string $className fully-qualified name of the storable class to implement
+     * @param mixed ... class constructor arguments
+     */
+    public function implement($className) {
         $constructArguments = array_slice(func_get_args(), 1);
 
         $classInfo = new \ReflectionClass($className);
@@ -75,10 +91,25 @@ class Environment {
         return new $implementationName($this->store, $constructArguments);
     }
 
+    /**
+     * Convert identity object to external ID string, as managed by the appropriate backend.
+     * This may result in the data entry being auto-created.
+     *
+     * @param mixed $obj ideninty object to export
+     * @return string representation of the identity object
+     */
     public function extern($obj) {
         return $this->store->extern($obj);
     }
 
+    /**
+     * Convert external ID string to identity object, as managed by the appropriate backend.
+     * Calling twice with the same class and ID will return the same object instance.
+     *
+     * @param string $className identity object class
+     * @param string $id external identifier string
+     * @return mixed identity object instance
+     */
     public function intern($className, $id) {
         return $this->store->intern($className, $id);
     }
