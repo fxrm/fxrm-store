@@ -14,17 +14,13 @@ class IdentitySerializer implements Serializer {
         $this->fromString = (object)array();
     }
 
-    function extern($obj, $noCreate = false) {
+    function extern($obj) {
         // passthrough null
         if ($obj === null) {
             return null;
         }
 
         if ( ! isset($this->toString[$obj])) {
-            if ($noCreate) {
-                throw new \Exception('unknown object'); // developer error
-            }
-
             if($this->className !== get_class($obj)) {
                 throw new \Exception('class mismatch'); // developer error
             }
@@ -36,10 +32,6 @@ class IdentitySerializer implements Serializer {
         }
 
         return $this->toString[$obj];
-    }
-
-    function externWithoutCreating($obj) {
-        return $this->extern($obj, true);
     }
 
     function intern($id) {

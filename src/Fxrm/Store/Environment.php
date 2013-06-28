@@ -116,7 +116,8 @@ class Environment {
             throw new \Exception('only identities can be externalized'); // developer error
         }
 
-        return $serializer->externWithoutCreating($obj);
+        // this will always auto-create data store entries (rows, etc) as necessary
+        return $serializer->extern($obj);
     }
 
     public function intern($className, $id) {
