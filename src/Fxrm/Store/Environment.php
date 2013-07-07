@@ -47,6 +47,16 @@ class Environment {
     public function implement($className) {
         $constructArguments = array_slice(func_get_args(), 1);
 
+        return $this->implementArgs($className, $constructArguments);
+    }
+
+    /**
+     * Create an instance of given class backed by this storage context. Extra constructor arguments are given as an explicit array.
+     *
+     * @param string $className fully-qualified name of the storable class to implement
+     * @param array $constructArguments class constructor arguments
+     */
+    public function implementArgs($className, $constructArguments) {
         $classInfo = new \ReflectionClass($className);
 
         $implementationName = 'FxrmStore_' . md5($className);
