@@ -27,17 +27,20 @@ class IdentitySerializerTest extends \PHPUnit_Framework_TestCase {
         $backend->expects($this->once())->method('create')->with($this->equalTo('Fxrm\\Store\\TESTIDENTITY'))->will($this->returnValue('TESTID'));
         $this->assertSame('TESTID', $this->s->extern($id));
         $this->assertSame('TESTID', $this->s->extern($id)); // run a second time to check
+
+        $this->assertSame($id, $this->s->intern('TESTID'));
     }
 
-    public function testIntern() {
-        $id = $this->s->intern('TESTEXISTINGID');
-        $this->assertInstanceOf('Fxrm\\Store\\TESTIDENTITY', $id);
+    public function testInternHasCorrectClass() {
+        $this->assertInstanceOf('Fxrm\\Store\\TESTIDENTITY', $this->s->intern('TESTEXISTINGID'));
+    }
 
-        // must return same reference
-        $this->assertSame($id, $this->s->intern('TESTEXISTINGID'));
+    public function testInternMaintainsUniqueReference() {
+        $this->assertSame($this->s->intern('TESTEXISTINGID'), $this->s->intern('TESTEXISTINGID'));
+    }
 
-        // must convert back to same string
-        $this->assertSame('TESTEXISTINGID', $this->s->extern($id));
+    public function testInternIsReversible() {
+        $this->assertSame('TESTEXISTINGID', $this->s->extern($this->s->intern('TESTEXISTINGID')));
     }
 }
 
