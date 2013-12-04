@@ -4,7 +4,11 @@ namespace Fxrm\Store;
 
 class MySQLFunctionalTest extends \PHPUnit_Framework_TestCase {
     public function setUp() {
-        $this->pdo = new \PDO('mysql:host=127.0.0.1;port=8889;dbname=fxrm_test', 'root', 'root');
+        $dsn = getenv('TEST_MYSQL_DSN') ?: 'mysql:host=127.0.0.1;port=8889;dbname=fxrm_test';
+        $user = getenv('TEST_MYSQL_USER') !== false ? getenv('TEST_MYSQL_USER') : 'root';
+        $password = getenv('TEST_MYSQL_PASSWORD') !== false ? getenv('TEST_MYSQL_PASSWORD') : 'root';
+
+        $this->pdo = new \PDO($dsn, $user, $password);
         $this->pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
 
         $this->pdo->exec('
@@ -12,13 +16,15 @@ class MySQLFunctionalTest extends \PHPUnit_Framework_TestCase {
             insert into MyTest (testProp, testDate) VALUES (\'v1\', 1), (\'v2\', 2);
         ');
 
-        $this->backend = new \Fxrm\Store\MySQLBackend('mysql:host=127.0.0.1;port=8889;dbname=fxrm_test', 'root', 'root');
+        $this->backend = new \Fxrm\Store\MySQLBackend($dsn, $user, $password);
     }
 
     public function tearDown() {
-        $this->pdo->exec('
-            drop table MyTest;
-        ');
+        if ($this->pdo) {
+            $this->pdo->exec('
+                drop table MyTest;
+            ');
+        }
     }
 
     public function testGet() {
