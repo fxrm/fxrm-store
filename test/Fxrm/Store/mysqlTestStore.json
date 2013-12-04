@@ -1,0 +1,13 @@
+{
+    "backends": {
+        "default": [ "Fxrm\\Store\\MySQLBackend", "mysql:host=127.0.0.1;port=8889;dbname=fxrm_test", "root", "root" ]
+    },
+
+    "idClasses": {
+    },
+
+    "valueClasses": [],
+
+    "methods": {
+    }
+}
