@@ -10,10 +10,11 @@ namespace Fxrm\Store;
 abstract class PDOBackend extends Backend {
     private $pdo;
 
-    function __construct($dsn) {
-        $this->pdo = new \PDO($dsn);
+    function __construct($dsn, $user = null, $password = null) {
+        $this->pdo = new \PDO($dsn, $user, $password);
 
         $this->pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+        $this->initPDO($this->pdo);
     }
 
     final function find($method, $entity, $valueMap, $returnType, $multiple) {
@@ -143,6 +144,10 @@ abstract class PDOBackend extends Backend {
 
         $sqlConstantName = "$className::$memberName";
         return defined($sqlConstantName) ? constant($sqlConstantName) : null;
+    }
+
+    protected function initPDO(\PDO $pdo) {
+        // implementations may override this to run extra initialization commands on the PDO instance
     }
 
     abstract protected function getImplementationNamespace();
