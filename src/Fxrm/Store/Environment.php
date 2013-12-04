@@ -60,6 +60,11 @@ class Environment {
         $classInfo = new \ReflectionClass($className);
 
         $implementationName = 'FxrmStore_' . md5($className);
+
+        if (class_exists($implementationName)) {
+            return new $implementationName($this->store, $constructArguments);
+        }
+
         $implementationSource = array();
 
         $implementationSource[] = 'class ' . $implementationName;
