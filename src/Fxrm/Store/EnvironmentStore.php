@@ -20,9 +20,12 @@ class EnvironmentStore {
         // set up backends
         $this->backendMap = (object)array();
 
-        foreach ($backends as $backendName => $backendArgs) {
-            $backendClass = new \ReflectionClass(array_shift($backendArgs));
-            $this->backendMap->$backendName = $backendClass->newInstanceArgs($backendArgs);
+        foreach ($backends as $backendName => $backendInstance) {
+            if ( ! ($backendInstance instanceof Backend)) {
+                throw new \Exception('unrecognized backend class');
+            }
+
+            $this->backendMap->$backendName = $backendInstance;
         }
 
         // set up serializers

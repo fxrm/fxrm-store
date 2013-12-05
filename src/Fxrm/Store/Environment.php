@@ -20,18 +20,18 @@ class Environment {
      * Initialize the storage environment context with implementation hints.
      * Implementation hints are a JSON object with the following keys:
      *
-     * - backends: map of backends, where keys are backend labels and values are arrays [ backendClassName, backendArg0... ]
      * - idClasses: identity-class -> backend-label map
      * - valueClasses: array of value-class names
      * - methods: method-name -> backend-label map, where method-name is of the form "classNamespace\className\methodName"
      *
      * @param string $configPath location of the storage hint JSON file
+     * @param array $backendMap keys are backend labels and values are backend implementations
      */
-    public function __construct($configPath) {
+    public function __construct($configPath, $backendMap) {
         $config = json_decode(file_get_contents($configPath));
 
         $this->store = new EnvironmentStore(
-            (object)$config->backends,
+            (object)$backendMap,
             (object)$config->idClasses,
             (array)$config->valueClasses,
             (object)$config->methods
