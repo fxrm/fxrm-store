@@ -113,7 +113,6 @@ class Environment {
         $implementationSource[] = 'public static function _getStorable($instance) { return $instance->s; }';
         $implementationSource[] = '}';
 
-        //echo(join('', $implementationSource));
         eval(join('', $implementationSource));
 
         return new $implementationName($this->store, $constructArguments);
@@ -330,6 +329,7 @@ class Environment {
             $signature->parameters->{$param->getName()} = ($class ? $class->getName() : null);
         }
 
+        // @todo copy original public/protected modifier!
         $signature->preamble = 'function ' . $signature->name . '(';
 
         $count = 0;
