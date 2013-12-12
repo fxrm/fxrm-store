@@ -103,10 +103,15 @@ class Environment {
 
             if (substr($name, 0, 3) === 'get') {
                 $implementationSource[] = $this->defineGetter($methodInfo);
-            } elseif (substr($name, 0, 4) === 'find') {
-                $implementationSource[] = $this->defineFinder($methodInfo);
             } else {
-                $implementationSource[] = $this->defineSetter($methodInfo);
+                $signature = $this->getSignature($methodInfo);
+
+                // @todo primitive types may fall through this check
+                if ($signature->returnType) {
+                    $implementationSource[] = $this->defineFinder($signature);
+                } else {
+                    $implementationSource[] = $this->defineSetter($signature);
+                }
             }
         }
 
@@ -179,9 +184,7 @@ class Environment {
         return join('', $source);
     }
 
-    private function defineSetter(\ReflectionMethod $info) {
-        $signature = $this->getSignature($info);
-
+    private function defineSetter($signature) {
         if (count((array)$signature->parameters) < 2) {
             throw new \Exception('setters must have an id parameter and at least one value parameter');
         }
@@ -216,9 +219,7 @@ class Environment {
         return join('', $source);
     }
 
-    private function defineFinder(\ReflectionMethod $info) {
-        $signature = $this->getSignature($info);
-
+    private function defineFinder($signature) {
         $backendName = $this->store->getBackendName($signature->fullName, $signature->returnType, null);
 
         $source[] = $signature->preamble . ' {';
