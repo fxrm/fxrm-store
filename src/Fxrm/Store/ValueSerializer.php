@@ -65,6 +65,10 @@ class ValueSerializer implements Serializer {
         $classInfo = new \ReflectionClass($class);
         $properties = $classInfo->getProperties();
 
+        if (count($properties) === 0 && $classInfo->getParentClass()) {
+            return $this->getValuePropertyInternalName($classInfo->getParentClass()->getName()); // @todo pass class ref itself for speed
+        }
+
         if (count($properties) !== 1) {
             throw new \Exception('value class must have one property');
         }
