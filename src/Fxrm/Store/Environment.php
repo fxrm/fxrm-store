@@ -153,7 +153,7 @@ class Environment {
             throw new \Exception('getters must have one parameter');
         }
 
-        if ($signature->returnArray || $signature->returnFieldMap) {
+        if ($signature->returnArray) {
             throw new \Exception('getters cannot return arrays or row objects');
         }
 
@@ -227,7 +227,6 @@ class Environment {
         $source[] = var_export($backendName, true) . ', ';
         $source[] = var_export($signature->fullName, true) . ', ';
         $source[] = var_export($signature->returnType, true) . ', ';
-        $source[] = var_export($signature->returnFieldMap, true) . ', ';
         $source[] = 'array(';
 
         $count = 0;
@@ -293,35 +292,15 @@ class Environment {
 
             $targetIdClass = $this->getRealClass($info->getDeclaringClass(), $targetIdClassHint);
 
-            $fieldMap = null;
-
-            if ($targetIdClass !== null) {
-                $targetClassInfo = new \ReflectionClass($targetIdClass);
-
-                if ( ! $this->store->isSerializableClass($targetIdClass)) {
-                    $fieldMap = array();
-
-                    foreach ($targetClassInfo->getProperties() as $prop) {
-                        if ($prop->isStatic()) {
-                            continue;
-                        }
-
-                        if ( ! $prop->isPublic()) {
-                            throw new \Exception('row object must only contain public properties');
-                        }
-
-                        $fieldMap[$prop->getName()] = $this->getPropertyClass($prop);
-                    }
-                }
+            if ($targetIdClass !== null && ! $this->store->isSerializableClass($targetIdClass)) {
+                throw new \Exception('non-serializable class ' . $targetIdClass);
             }
 
             $signature->returnArray = $isArray;
             $signature->returnType = $targetIdClass;
-            $signature->returnFieldMap = $fieldMap;
         } else {
             $signature->returnArray = false;
             $signature->returnType = null;
-            $signature->returnFieldMap = null;
         }
 
         $signature->parameters = (object)array();
