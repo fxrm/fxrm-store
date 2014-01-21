@@ -115,7 +115,7 @@ class Environment {
             }
         }
 
-        $implementationSource[] = 'public static function _getStorable($instance) { return $instance->s; }';
+        $implementationSource[] = 'public static function _getFxrmStore($instance) { return $instance->s; }';
         $implementationSource[] = '}';
 
         eval(join('', $implementationSource));
@@ -135,6 +135,20 @@ class Environment {
     }
 
     /**
+     * Convert identity object to external ID string, as managed by the appropriate backend.
+     * This may result in the data entry being auto-created.
+     *
+     * @param mixed $impl implementation of a storage interface
+     * @param mixed $obj identity object to export
+     * @return string representation of the identity object
+     */
+    public static function exportUsing($impl, $obj) {
+        $implClass = get_class($impl);
+
+        return $implClass::_getFxrmStore($impl)->extern($obj);
+    }
+
+    /**
      * Convert external ID string to identity object, as managed by the appropriate backend.
      * Calling twice with the same class and ID will return the same object instance.
      *
@@ -144,6 +158,21 @@ class Environment {
      */
     public function import($className, $id) {
         return $this->store->intern($className, $id);
+    }
+
+    /**
+     * Convert external ID string to identity object, as managed by the appropriate backend.
+     * Calling twice with the same class and ID will return the same object instance.
+     *
+     * @param mixed $impl implementation of a storage interface
+     * @param string $className identity object class
+     * @param string $id external identifier string
+     * @return mixed identity object instance
+     */
+    public function importUsing($impl, $className, $id) {
+        $implClass = get_class($impl);
+
+        return $implClass::_getFxrmStore($impl)->intern($className, $id);
     }
 
     private function defineGetter(\ReflectionMethod $info) {
