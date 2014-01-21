@@ -68,7 +68,7 @@ class Environment {
         $implementationSource = array();
 
         $implementationSource[] = 'class ' . $implementationName;
-        $implementationSource[] = ' extends \\' . $classInfo->getName();
+        $implementationSource[] = ' ' . ($classInfo->isInterface() ? 'implements' : 'extends') . ' \\' . $classInfo->getName();
         $implementationSource[] = '{ private $s;';
 
         // implement constructor
