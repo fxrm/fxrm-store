@@ -110,6 +110,10 @@ abstract class PDOBackend extends Backend {
     }
 
     private function toValue($type, $data) {
+        if ($data === null) {
+            return null;
+        }
+
         if ($type === Backend::DATE_TIME_TYPE) {
             return $this->internDateTime($data);
         }
@@ -118,6 +122,10 @@ abstract class PDOBackend extends Backend {
     }
 
     private function fromValue($value) {
+        if ($value === null) {
+            return null;
+        }
+
         if ($value instanceof \DateTime) {
             return $this->externDateTime($value);
         }
