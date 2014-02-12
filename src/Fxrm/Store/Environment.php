@@ -16,6 +16,8 @@ namespace Fxrm\Store;
 class Environment {
     private static $PRIMITIVE_TYPES = array('string', 'integer', 'int'); // @todo add more
 
+    private $classMappingsCache = array();
+
     /**
      * Initialize the storage environment context with implementation hints.
      * Implementation hints are a JSON object with the following keys:
@@ -29,6 +31,10 @@ class Environment {
      */
     public function __construct($configPath, $backendMap) {
         $config = json_decode(file_get_contents($configPath));
+
+        if ($config === null) {
+            throw new \Exception('cannot parse store implementation config');
+        }
 
         $this->store = new EnvironmentStore(
             (object)$backendMap,
@@ -102,9 +108,9 @@ class Environment {
             $name = $methodInfo->getName();
 
             if (substr($name, 0, 3) === 'get') {
-                $implementationSource[] = $this->defineGetter($methodInfo);
+                $implementationSource[] = $this->defineGetter($methodInfo, $classInfo->getName());
             } else {
-                $signature = $this->getSignature($methodInfo);
+                $signature = $this->getSignature($methodInfo, $classInfo->getName());
 
                 // @todo primitive types may fall through this check
                 if ($signature->returnType) {
@@ -175,8 +181,8 @@ class Environment {
         return $implClass::_getFxrmStore($impl)->intern($className, $id);
     }
 
-    private function defineGetter(\ReflectionMethod $info) {
-        $signature = $this->getSignature($info);
+    private function defineGetter(\ReflectionMethod $info, $contractClassName) {
+        $signature = $this->getSignature($info, $contractClassName);
 
         if (count((array)$signature->parameters) != 1) {
             throw new \Exception('getters must have one parameter');
@@ -186,7 +192,7 @@ class Environment {
             throw new \Exception('getters cannot return arrays or row objects');
         }
 
-        if ( ! preg_match('/([^\\\\]+)Id$/', $signature->firstParameterClass, $idMatch)) {
+        if ( ! preg_match('/([^\\\\]+)Id$/', $signature->firstDeclaredParameterClass, $idMatch)) {
             throw new \Exception('target class must be an identity');
         }
 
@@ -302,7 +308,43 @@ class Environment {
         return null;
     }
 
-    private function getSignature(\ReflectionMethod $info) {
+    private function getClassMapping($className, $targetClassName) {
+        if (!array_key_exists($className, $this->classMappingsCache)) {
+            $this->classMappingsCache[$className] = $this->computeClassMappings(new \ReflectionClass($className));
+        }
+
+        $cache = $this->classMappingsCache[$className];
+
+        if ($targetClassName === null) {
+            return null;
+        }
+
+        // @todo recursive piping back? esp if doing ancestor checks as well
+        return array_key_exists($targetClassName, $cache) ? $cache[$targetClassName] : $targetClassName;
+    }
+
+    private function computeClassMappings(\ReflectionClass $info) {
+        // this would be done using generics in Java (expressing a generic identity as a specific implementation class)
+        $map = array();
+        $comment = $info->getDocComment();
+
+        $matches = array();
+        preg_match_all('/@map\\s+(\\S+)\\s+(\\S+)/', $comment, $matches, PREG_SET_ORDER);
+
+        foreach ($matches as $match) {
+            $fromHint = $match[1];
+            $toHint = $match[2];
+
+            $from = $this->getRealClass($info, $fromHint);
+            $to = $this->getRealClass($info, $toHint);
+
+            $map[$from] = $to;
+        }
+
+        return $map;
+    }
+
+    private function getSignature(\ReflectionMethod $info, $contractClassName) {
         $signature = (object)array();
 
         $signature->name = $info->getName();
@@ -320,11 +362,12 @@ class Environment {
                 $targetIdClassHint = substr($targetIdClassHint, 0, -2);
             }
 
-            $targetIdClass = $this->getRealClass($info->getDeclaringClass(), $targetIdClassHint);
+            $targetIdClass = $this->getClassMapping($contractClassName, $this->getRealClass($info->getDeclaringClass(), $targetIdClassHint));
 
             $fieldMap = null;
 
             if ($targetIdClass !== null) {
+                // @todo this should be phased out or passed through class mapping
                 $targetClassInfo = new \ReflectionClass($targetIdClass);
 
                 if ( ! $this->store->isSerializableClass($targetIdClass)) {
@@ -336,7 +379,7 @@ class Environment {
                         }
 
                         if ( ! $prop->isPublic()) {
-                            throw new \Exception('row object must only contain public properties');
+                            throw new \Exception('row object must only contain public properties: ' . $targetIdClass);
                         }
 
                         $fieldMap[$prop->getName()] = $this->getPropertyClass($prop);
@@ -353,27 +396,26 @@ class Environment {
             $signature->returnFieldMap = null;
         }
 
+        $preambleParams = array();
         $signature->parameters = (object)array();
-        foreach ($info->getParameters() as $param) {
-            $class = $param->getClass();
-            $signature->parameters->{$param->getName()} = ($class ? $class->getName() : null);
+        foreach ($info->getParameters() as $count => $param) {
+            $unmappedClass = $param->getClass();
+            $unmappedClassName = $unmappedClass ? $unmappedClass->getName() : null;
+            $className = $this->getClassMapping($contractClassName, $unmappedClassName);
+
+            $signature->parameters->{$param->getName()} = $className;
+
+            if ($count === 0) {
+                $signature->firstParameterName = $param;
+                $signature->firstParameterClass = $className;
+                $signature->firstDeclaredParameterClass = $unmappedClassName;
+            }
+
+            $preambleParams[] = ($unmappedClassName ? "\\$unmappedClassName" : '') . ' $a' . $count;
         }
 
         // @todo copy original public/protected modifier!
-        $signature->preamble = 'function ' . $signature->name . '(';
-
-        $count = 0;
-        foreach ($signature->parameters as $param => $class) {
-            if ($count === 0) {
-                $signature->firstParameterName = $param;
-                $signature->firstParameterClass = $class;
-            }
-
-            $signature->preamble .= ($count > 0 ? ',' : '') . ($class ? "\\$class" : '') . ' $a' . $count;
-            $count += 1;
-        }
-
-        $signature->preamble .= ')';
+        $signature->preamble = 'function ' . $signature->name . '(' . join(',', $preambleParams) . ')';
 
         return $signature;
     }
