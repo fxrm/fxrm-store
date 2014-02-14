@@ -113,7 +113,11 @@ class EnvironmentStore {
         $this->backendMap->$backendName->set($implName, $idClass, $id, $values);
     }
 
-    function find($backendName, $implName, $returnClass, $fieldClassMap, $properties, $returnArray) {
+    function find($backendName, $implName, $returnClass, $properties, $returnArray) {
+        if (!$this->isIdentityClass($returnClass)) {
+            throw new \Exception('cannot find non-identity class');
+        }
+
         $values = array();
 
         foreach ($properties as $propertyName => $qualifiedValue) {
@@ -122,26 +126,15 @@ class EnvironmentStore {
             $values[$propertyName] = $this->externAny($propertyClass, $value);
         }
 
-        $idClass = $this->isIdentityClass($returnClass) ? $returnClass : null;
-
-        $data = $this->backendMap->$backendName->find($implName, $idClass, $values, $fieldClassMap ? $this->getBackendTypeMap($fieldClassMap) : $this->getBackendType($returnClass), $returnArray);
+        // always getting backend type for ID class because we can't assume it is string/integer
+        $data = $this->backendMap->$backendName->find($implName, $returnClass, $values, $this->getBackendType($returnClass), $returnArray);
 
         if ($returnArray) {
-            if ($fieldClassMap) {
-                foreach ($data as &$value) {
-                    $value = $this->internRow($returnClass, $fieldClassMap, $value);
-                }
-            } else {
-                foreach ($data as &$value) {
-                    $value = $this->internAny($returnClass, $value);
-                }
+            foreach ($data as &$value) {
+                $value = $this->internAny($returnClass, $value);
             }
         } else {
-            if ($fieldClassMap) {
-                $data = $this->internRow($returnClass, $fieldClassMap, $data);
-            } else {
-                $data = $this->internAny($returnClass, $data);
-            }
+            $data = $this->internAny($returnClass, $data);
         }
 
         return $data;
@@ -153,17 +146,6 @@ class EnvironmentStore {
 
     private function isIdentityClass($class) {
         return property_exists($this->serializerMap, $class) && $this->serializerMap->$class instanceof IdentitySerializer;
-    }
-
-    private function internRow($className, $fieldClassMap, $value) {
-        $result = new $className();
-
-        // copying strictly only the defined properties
-        foreach ($fieldClassMap as $k => $class) {
-            $result->$k = $this->internAny($class, $value->$k);
-        }
-
-        return $result;
     }
 
     private function internAny($class, $value) {

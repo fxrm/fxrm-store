@@ -32,14 +32,8 @@ abstract class PDOBackend extends Backend {
         $stmt->closeCursor();
 
         // process all rows in-place
-        if (is_array($returnType)) {
-            foreach ($rows as &$row) {
-                $row = $this->toRow($returnType, $row);
-            }
-        } else {
-            foreach ($rows as &$row) {
-                $row = $this->toValue($returnType, $row);
-            }
+        foreach ($rows as &$row) {
+            $row = $this->toValue($returnType, $row);
         }
 
         // model may expect object to not exist: null value is the "pure" way to communicate that
@@ -96,17 +90,6 @@ abstract class PDOBackend extends Backend {
         $stmt->closeCursor();
 
         return $id;
-    }
-
-    private function toRow($fieldTypeMap, $data) {
-        $result = (object)null;
-
-        // permissively copying all fields, including those with unknown types
-        foreach ($data as $k => $v) {
-            $result->$k = isset($fieldTypeMap[$k]) ? $this->toValue($fieldTypeMap[$k], $v) : $v;
-        }
-
-        return $result;
     }
 
     private function toValue($type, $data) {
