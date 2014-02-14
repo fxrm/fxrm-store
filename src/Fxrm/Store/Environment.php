@@ -169,7 +169,7 @@ class Environment {
      * @param string $id external identifier string
      * @return mixed identity object instance
      */
-    public function importUsing($impl, $className, $id) {
+    public static function importUsing($impl, $className, $id) {
         $implClass = get_class($impl);
 
         return $implClass::_getFxrmStore($impl)->intern($className, $id);
