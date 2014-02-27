@@ -369,7 +369,8 @@ class Environment {
                 $signature->firstParameterClass = $class;
             }
 
-            $signature->preamble .= ($count > 0 ? ',' : '') . ($class ? "\\$class" : '') . ' $a' . $count;
+            // @todo read the allowsNull property of the parameter!
+            $signature->preamble .= ($count > 0 ? ',' : '') . ($class ? "\\$class" : '') . ' $a' . $count . ' = null';
             $count += 1;
         }
 
