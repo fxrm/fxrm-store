@@ -98,6 +98,31 @@ abstract class PDOBackend extends Backend {
         return $id;
     }
 
+    final function retrieve($querySpecMap, $paramMap, $returnTypeMap) {
+        $ns = $this->getImplementationNamespace();
+
+        if (!array_key_exists($ns, $querySpecMap)) {
+            throw new \Exception('no query spec for namespace "' . $ns . '"');
+        }
+
+        $spec = $querySpecMap[$ns];
+
+        $stmt = $this->pdo->prepare($spec);
+        foreach ($paramMap as $field => $value) {
+            $stmt->bindValue(is_int($field) ? $field + 1 : ':' . $field, $this->fromValue($value));
+        }
+        $stmt->execute();
+        $rows = $stmt->fetchAll(\PDO::FETCH_OBJ);
+        $stmt->closeCursor();
+
+        // process all rows in-place
+        foreach ($rows as &$row) {
+            $row = $this->toRow($returnTypeMap, $row);
+        }
+
+        return $rows;
+    }
+
     private function toRow($fieldTypeMap, $data) {
         $result = (object)null;
 

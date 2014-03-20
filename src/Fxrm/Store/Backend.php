@@ -17,6 +17,8 @@ abstract class Backend {
     abstract function set($method, $entity, $id, $valueMap);
 
     abstract function create($entity);
+
+    abstract function retrieve($querySpecMap, $paramMap, $returnTypeMap);
 }
 
 ?>

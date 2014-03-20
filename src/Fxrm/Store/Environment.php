@@ -175,6 +175,22 @@ class Environment {
         return $implClass::_getFxrmStore($impl)->intern($className, $id);
     }
 
+    /**
+     * Run native query on the backend adapter. Strongly encouraged to use only for reading data, not updating.
+     *
+     * @param mixed $impl implementation of a storage interface
+     * @param array $backendName name of the backend to invoke
+     * @param array $querySpecMap map of native dialect names and corresponding query specs (e.g. 'mysql' => 'select ...')
+     * @param array $paramMap map of query parameters
+     * @param array $columnTypeMap map of column names to class names
+     * @return array rows of internalized data as value/id objects
+     */
+    public static function retrieveUsing($impl, $backendName, $querySpecMap, $paramMap, $columnTypeMap) {
+        $implClass = get_class($impl);
+
+        return $implClass::_getFxrmStore($impl)->retrieve($backendName, $querySpecMap, $paramMap, $columnTypeMap);
+    }
+
     private function defineGetter(\ReflectionMethod $info) {
         $signature = $this->getSignature($info);
 

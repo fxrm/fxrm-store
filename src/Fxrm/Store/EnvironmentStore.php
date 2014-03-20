@@ -147,6 +147,26 @@ class EnvironmentStore {
         return $data;
     }
 
+    function retrieve($backendName, $querySpecMap, $paramMap, $returnTypeMap) {
+        $paramValueMap = array();
+
+        foreach ($paramMap as $paramName => $paramValue) {
+            // @todo find a way to declare param class?
+            $paramClass = get_class($paramValue);
+            $paramValueMap[$paramName] = $this->externAny($paramClass, $paramValue);
+        }
+
+        $data = $this->backendMap->$backendName->retrieve($querySpecMap, $paramValueMap, $this->getBackendTypeMap($returnTypeMap));
+
+        foreach ($data as &$value) {
+            foreach ($returnTypeMap as $k => $class) {
+                $value->$k = $this->internAny($class, $value->$k);
+            }
+        }
+
+        return $data;
+    }
+
     function isSerializableClass($class) {
         return property_exists($this->serializerMap, $class);
     }
