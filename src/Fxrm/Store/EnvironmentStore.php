@@ -152,7 +152,7 @@ class EnvironmentStore {
 
         foreach ($paramMap as $paramName => $paramValue) {
             // @todo find a way to declare param class?
-            $paramClass = get_class($paramValue);
+            $paramClass = is_object($paramValue) ? get_class($paramValue) : null;
             $paramValueMap[$paramName] = $this->externAny($paramClass, $paramValue);
         }
 
