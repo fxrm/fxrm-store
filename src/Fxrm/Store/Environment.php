@@ -106,8 +106,7 @@ class Environment {
             } else {
                 $signature = $this->getSignature($methodInfo);
 
-                // @todo primitive types may fall through this check
-                if ($signature->returnType) {
+                if ($signature->returnType || substr($name, 0, 4) === 'find') {
                     $implementationSource[] = $this->defineFinder($signature);
                 } else {
                     $implementationSource[] = $this->defineSetter($signature);
