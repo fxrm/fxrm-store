@@ -106,7 +106,7 @@ class Environment {
             } else {
                 $signature = $this->getSignature($methodInfo);
 
-                if ($signature->returnType || substr($name, 0, 4) === 'find') {
+                if ($signature->hasDeclaredReturnType) {
                     $implementationSource[] = $this->defineFinder($signature);
                 } else {
                     $implementationSource[] = $this->defineSetter($signature);
@@ -326,6 +326,10 @@ class Environment {
 
         $comment = $info->getDocComment();
         if (preg_match('/@return\\s+(\\S+)/', $comment, $commentMatch)) {
+            // flag for semantic auto-magic, even for primitives
+            // @todo handle "void"
+            $signature->hasDeclaredReturnType = true;
+
             // @todo ignore standard names like "string" and others
             $targetIdClassHint = $commentMatch[1];
 
@@ -363,6 +367,7 @@ class Environment {
             $signature->returnType = $targetIdClass;
             $signature->returnFieldMap = $fieldMap;
         } else {
+            $signature->hasDeclaredReturnType = false;
             $signature->returnArray = false;
             $signature->returnType = null;
             $signature->returnFieldMap = null;
