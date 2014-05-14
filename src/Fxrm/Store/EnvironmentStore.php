@@ -138,7 +138,7 @@ class EnvironmentStore {
             }
         } else {
             if ($fieldClassMap) {
-                $data = $this->internRow($returnClass, $fieldClassMap, $data);
+                $data = $data === null ? null : $this->internRow($returnClass, $fieldClassMap, $data);
             } else {
                 $data = $this->internAny($returnClass, $data);
             }
