@@ -80,11 +80,7 @@ abstract class PDOBackend extends Backend {
 
         $stmt->execute();
 
-        // MySQL may also return zero count if value was unchanged
-        if ($stmt->rowCount() > 1) {
-            throw new \Exception('did not update at most one row');
-        }
-
+        // not checking updated row count in case the custom query updates multiple rows
         $stmt->closeCursor();
     }
 
