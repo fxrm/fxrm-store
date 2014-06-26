@@ -68,8 +68,8 @@ class MySQLBackend extends PDOBackend {
         return join('', $sql);
     }
 
-    protected function generateCreateQuery($entity) {
-        return 'INSERT INTO `' . $entity . '` (id) VALUES (NULL)';
+    protected function generateCreateQuery($entity, $isPredefinedId) {
+        return 'INSERT INTO `' . $entity . '` (id) VALUES (' . ($isPredefinedId ? ':id' : 'NULL') . ')';
     }
 }
 

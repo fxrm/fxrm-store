@@ -9,8 +9,13 @@ namespace Fxrm\Store;
 
 abstract class PDOBackend extends Backend {
     private $pdo;
+    private $idGeneratorMap;
 
-    function __construct($dsn, $user = null, $password = null) {
+    function __construct($dsn, $user = null, $password = null, $options = array()) {
+        $this->idGeneratorMap = array_key_exists('idGeneratorMap', $options)
+            ? (array)$options['idGeneratorMap']
+            : array();
+
         $this->pdo = new \PDO($dsn, $user, $password);
 
         $this->pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
@@ -51,7 +56,7 @@ abstract class PDOBackend extends Backend {
         $sql = $this->getCustomQuery($method) ?: $this->generateGetQuery($this->getEntityName($entity), $field);
 
         $stmt = $this->pdo->prepare($sql);
-        $stmt->bindValue(':id', (int)$id);
+        $stmt->bindValue(':id', $id);
         $stmt->execute();
 
         // expecting only a single value per row
@@ -70,7 +75,7 @@ abstract class PDOBackend extends Backend {
     final function set($method, $entity, $id, $valueMap) {
         // @todo use the original model parameter name as query param
         $stmt = $this->pdo->prepare($this->getCustomQuery($method) ?: $this->generateSetQuery($this->getEntityName($entity), array_keys($valueMap)));
-        $stmt->bindValue(':id', (int)$id);
+        $stmt->bindValue(':id', $id);
 
         $valueCount = 0;
         foreach ($valueMap as $field => $value) {
@@ -85,9 +90,21 @@ abstract class PDOBackend extends Backend {
     }
 
     final function create($entity) {
-        $stmt = $this->pdo->prepare($this->generateCreateQuery($this->getEntityName($entity)));
+        $predefinedId = null;
+
+        if (array_key_exists($entity, $this->idGeneratorMap)) {
+            $generator = $this->idGeneratorMap[$entity];
+            $predefinedId = $generator($this->pdo);
+        }
+
+        $stmt = $this->pdo->prepare($this->generateCreateQuery($this->getEntityName($entity), ($predefinedId !== null)));
+
+        if ($predefinedId !== null) {
+            $stmt->bindValue(':id', $predefinedId);
+        }
+
         $stmt->execute();
-        $id = $this->pdo->lastInsertId();
+        $id = $predefinedId === null ? $this->pdo->lastInsertId() : $predefinedId;
 
         $stmt->closeCursor();
 
@@ -192,7 +209,7 @@ abstract class PDOBackend extends Backend {
 
     abstract protected function generateSetQuery($entity, $fieldList);
 
-    abstract protected function generateCreateQuery($entity);
+    abstract protected function generateCreateQuery($entity, $isPredefinedId);
 }
 
 ?>
