@@ -27,19 +27,8 @@ class ValueSerializer implements Serializer {
             throw new \Exception('class mismatch'); // developer error
         }
 
-        $bin = serialize($obj);
-        $internalName = $this->getValuePropertyInternalName($class);
-
-        $binPrefix = 'O:' . strlen($class) . ':"' . $class . '":1:{s:' . strlen($internalName) . ':"' . $internalName . '";';
-        $binSuffix = '}';
-
-        if (substr($bin, 0, strlen($binPrefix)) !== $binPrefix || substr($bin, -strlen($binSuffix)) !== $binSuffix) {
-            throw new \Exception('could not serialize value');
-        }
-
-        $valueBin = substr($bin, strlen($binPrefix), -strlen($binSuffix));
-
-        return unserialize($valueBin);
+        $property = $this->getValueProperty($class);
+        return $property->getValue($obj);
     }
 
     function intern($v) {
@@ -49,10 +38,12 @@ class ValueSerializer implements Serializer {
         }
 
         // reify using deserialization trick to avoid triggering validation
-        $internalName = $this->getValuePropertyInternalName($this->class);
+        $property = $this->getValueProperty($this->class);
 
-        $bin = 'O:' . strlen($this->class) . ':"' . $this->class . '":1:{s:' . strlen($internalName) . ':"' . $internalName . '";s:' . strlen($v) . ':"' . $v . '";}';
+        $bin = 'O:' . strlen($this->class) . ':"' . $this->class . '":0:{}';
         $obj = unserialize($bin);
+
+        $property->setValue($obj, $v);
 
         if ($obj === false) {
             throw new \Exception('error reifying value object');
@@ -61,19 +52,21 @@ class ValueSerializer implements Serializer {
         return $obj;
     }
 
-    private function getValuePropertyInternalName($class) {
+    private function getValueProperty($class) {
         $classInfo = new \ReflectionClass($class);
         $properties = $classInfo->getProperties();
 
         if (count($properties) === 0 && $classInfo->getParentClass()) {
-            return $this->getValuePropertyInternalName($classInfo->getParentClass()->getName()); // @todo pass class ref itself for speed
+            return $this->getValueProperty($classInfo->getParentClass()->getName()); // @todo pass class ref itself for speed
         }
 
         if (count($properties) !== 1) {
             throw new \Exception('value class must have one property');
         }
 
-        return "\x00" . $class . "\x00" . $properties[0]->getName();
+        $properties[0]->setAccessible(true);
+
+        return $properties[0];
     }
 }
 
