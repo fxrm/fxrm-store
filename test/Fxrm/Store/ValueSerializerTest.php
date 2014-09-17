@@ -5,6 +5,7 @@ namespace Fxrm\Store;
 class ValueSerializerTest extends \PHPUnit_Framework_TestCase {
     public function setUp() {
         $this->s = new ValueSerializer('Fxrm\\Store\\TESTVALUE');
+        $this->sub = new ValueSerializer('Fxrm\\Store\\TESTSUBVALUE');
     }
 
     public function testExternNull() {
@@ -24,6 +25,14 @@ class ValueSerializerTest extends \PHPUnit_Framework_TestCase {
         $this->assertSame('TEST2', $this->s->intern('TEST2')->testObtainX());
     }
 
+    public function testSubExtern() {
+        $this->assertSame('TESTVAL', $this->sub->extern(new TESTSUBVALUE()));
+    }
+
+    public function testSubIntern() {
+        $this->assertSame('TEST2', $this->sub->intern('TEST2')->testObtainSubX());
+    }
+
     public function testInternHasCorrectClass() {
         $this->assertInstanceOf('Fxrm\\Store\\TESTVALUE', $this->s->intern('TEST3'));
     }
@@ -38,5 +47,11 @@ class TESTVALUE {
 
     public function testObtainX() {
         return $this->x;
+    }
+}
+
+class TESTSUBVALUE extends TESTVALUE {
+    public function testObtainSubX() {
+        return $this->testObtainX();
     }
 }

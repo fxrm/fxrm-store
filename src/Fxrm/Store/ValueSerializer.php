@@ -52,7 +52,7 @@ class ValueSerializer implements Serializer {
         $properties = $classInfo->getProperties();
 
         if (count($properties) === 0 && $classInfo->getParentClass()) {
-            return $this->getValueProperty($classInfo->getParentClass()->getName()); // @todo pass class ref itself for speed
+            return $this->getValueProperty($classInfo->getParentClass());
         }
 
         if (count($properties) !== 1) {
