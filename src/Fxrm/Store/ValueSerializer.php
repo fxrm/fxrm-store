@@ -9,9 +9,13 @@ namespace Fxrm\Store;
 
 class ValueSerializer implements Serializer {
     private $class;
+    private $property;
 
     function __construct($class) {
-        $this->class = $class;
+        $classInfo = new \ReflectionClass($class);
+
+        $this->class = $classInfo->getName();
+        $this->property = $this->getValueProperty($classInfo);
     }
 
     function extern($obj) {
@@ -27,8 +31,7 @@ class ValueSerializer implements Serializer {
             throw new \Exception('class mismatch'); // developer error
         }
 
-        $property = $this->getValueProperty($class);
-        return $property->getValue($obj);
+        return $this->property->getValue($obj);
     }
 
     function intern($v) {
@@ -38,22 +41,14 @@ class ValueSerializer implements Serializer {
         }
 
         // reify using deserialization trick to avoid triggering validation
-        $property = $this->getValueProperty($this->class);
+        $obj = unserialize('O:' . strlen($this->class) . ':"' . $this->class . '":0:{}');
 
-        $bin = 'O:' . strlen($this->class) . ':"' . $this->class . '":0:{}';
-        $obj = unserialize($bin);
-
-        $property->setValue($obj, $v);
-
-        if ($obj === false) {
-            throw new \Exception('error reifying value object');
-        }
+        $this->property->setValue($obj, $v);
 
         return $obj;
     }
 
-    private function getValueProperty($class) {
-        $classInfo = new \ReflectionClass($class);
+    private function getValueProperty(\ReflectionClass $classInfo) {
         $properties = $classInfo->getProperties();
 
         if (count($properties) === 0 && $classInfo->getParentClass()) {
