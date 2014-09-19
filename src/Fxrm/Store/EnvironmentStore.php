@@ -39,7 +39,8 @@ class EnvironmentStore {
         }
 
         foreach ($valueClasses as $valueClass) {
-            $this->serializerMap->$valueClass = new ValueSerializer($valueClass);
+            // @todo what about recursion?
+            $this->serializerMap->$valueClass = new ValueSerializer($valueClass, $this);
         }
 
         $this->serializerMap->DateTime = new PassthroughSerializer();
@@ -51,6 +52,12 @@ class EnvironmentStore {
         foreach ($methods as $method => $backendName) {
             $this->methodMap->$method = $backendName;
         }
+    }
+
+    function createClassSerializer($className) {
+        return $this->isIdentityClass($className) ?
+            new IdentitySerializer($className, $this->backendMap->{$this->idClassMap->$className}) :
+            new ValueSerializer($className, $this);
     }
 
     function extern($obj) {
