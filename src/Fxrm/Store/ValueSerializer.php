@@ -9,13 +9,22 @@ namespace Fxrm\Store;
 
 class ValueSerializer implements Serializer {
     private $class;
-    private $property;
+    private $propertyMap;
+    private $propertyClassMap;
+    private $singlePropertyName;
 
-    function __construct($class) {
+    function __construct($class, EnvironmentStore $store) {
         $classInfo = new \ReflectionClass($class);
 
         $this->class = $classInfo->getName();
-        $this->property = $this->getValueProperty($classInfo);
+        $this->propertyMap = array();
+        $this->propertyClassMap = array();
+
+        $this->collectValueProperties($classInfo, $store);
+
+        if (count($this->propertyMap) < 1) {
+            throw new \Exception('value class must have at least one property');
+        }
     }
 
     function extern($obj) {
@@ -24,14 +33,25 @@ class ValueSerializer implements Serializer {
             return null;
         }
 
-        // use serialization trick to extract value
-        $class = get_class($obj);
-
-        if($this->class !== get_class($obj)) {
+        if(!is_object($obj) || $this->class !== get_class($obj)) {
             throw new \Exception('class mismatch'); // developer error
         }
 
-        return $this->property->getValue($obj);
+        if (count($this->propertyMap) === 1) {
+            foreach ($this->propertyMap as $n => $prop) {
+                $pv = $prop->getValue($obj);
+                return $this->propertyClassMap[$n]->extern($pv);
+            }
+        } else {
+            $v = (object)array();
+
+            foreach ($this->propertyMap as $n => $prop) {
+                $pv = $prop->getValue($obj);
+                $v->$n = $this->propertyClassMap[$n]->extern($pv);
+            }
+
+            return $v;
+        }
     }
 
     function intern($v) {
@@ -43,25 +63,38 @@ class ValueSerializer implements Serializer {
         // reify using deserialization trick to avoid triggering validation
         $obj = unserialize('O:' . strlen($this->class) . ':"' . $this->class . '":0:{}');
 
-        $this->property->setValue($obj, $v);
+        if (count($this->propertyMap) === 1) {
+            foreach ($this->propertyMap as $n => $prop) {
+                $pv = $this->propertyClassMap[$n]->intern($v);
+                $prop->setValue($obj, $pv);
+            }
+        } else {
+            foreach ($this->propertyMap as $n => $prop) {
+                if (!property_exists($v, $n)) {
+                    throw new \Exception('missing raw property'); // @todo custom exception
+                }
+
+                $pv = $this->propertyClassMap[$n]->intern($v->$n);
+                $prop->setValue($obj, $pv);
+            }
+        }
 
         return $obj;
     }
 
-    private function getValueProperty(\ReflectionClass $classInfo) {
-        $properties = $classInfo->getProperties();
-
-        if (count($properties) === 0 && $classInfo->getParentClass()) {
-            return $this->getValueProperty($classInfo->getParentClass());
+    private function collectValueProperties(\ReflectionClass $classInfo, EnvironmentStore $store) {
+        if ($classInfo->getParentClass()) {
+            $this->collectValueProperties($classInfo->getParentClass(), $store);
         }
 
-        if (count($properties) !== 1) {
-            throw new \Exception('value class must have one property');
+        foreach ($classInfo->getProperties() as $property) {
+            $type = TypeInfo::createForProperty($property);
+
+            $property->setAccessible(true);
+
+            $this->propertyMap[$property->getName()] = $property;
+            $this->propertyClassMap[$property->getName()] = $type->createSerializer($store);
         }
-
-        $properties[0]->setAccessible(true);
-
-        return $properties[0];
     }
 }
 
