@@ -8,6 +8,16 @@
 namespace Fxrm\Store;
 
 class PassthroughSerializer implements Serializer {
+    private $backendType;
+
+    function __construct($backendType = null) {
+        $this->backendType = $backendType;
+    }
+
+    function getBackendType() {
+        return $this->backendType;
+    }
+
     function extern($obj) {
         return $obj;
     }

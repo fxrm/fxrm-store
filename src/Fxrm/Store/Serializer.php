@@ -11,6 +11,8 @@ interface Serializer {
     function extern($obj);
 
     function intern($id);
+
+    function getBackendType();
 }
 
 ?>

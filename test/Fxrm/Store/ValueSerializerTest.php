@@ -15,6 +15,12 @@ class ValueSerializerTest extends \PHPUnit_Framework_TestCase {
         $this->s2 = new ValueSerializer('Fxrm\\Store\\TESTCOMPLEXVALUE', $this->store);
     }
 
+    public function testBackendTypes() {
+        $this->assertSame(null, $this->s->getBackendType());
+        $this->assertSame(null, $this->sub->getBackendType());
+        $this->assertSame(array('x' => null, 'a' => null, 'b' => array(null)), $this->s2->getBackendType());
+    }
+
     public function testExternNull() {
         $this->assertSame(null, $this->s->extern(null));
     }

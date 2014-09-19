@@ -43,7 +43,7 @@ class EnvironmentStore {
             $this->serializerMap->$valueClass = new ValueSerializer($valueClass, $this);
         }
 
-        $this->serializerMap->DateTime = new PassthroughSerializer();
+        $this->serializerMap->DateTime = new PassthroughSerializer(Backend::DATE_TIME_TYPE);
 
         // copy over the method backend names
         // @todo verify names
@@ -55,6 +55,10 @@ class EnvironmentStore {
     }
 
     function createClassSerializer($className) {
+        if ($className === 'DateTime') {
+            return new PassthroughSerializer(Backend::DATE_TIME_TYPE);
+        }
+
         return $this->isIdentityClass($className) ?
             new IdentitySerializer($className, $this->backendMap->{$this->idClassMap->$className}) :
             new ValueSerializer($className, $this);
@@ -202,7 +206,7 @@ class EnvironmentStore {
     }
 
     private function getBackendType($class) {
-        return $class === 'DateTime' ? Backend::DATE_TIME_TYPE : null;
+        return $this->serializerMap->$class->getBackendType();
     }
 
     private function getBackendTypeMap($classMap) {

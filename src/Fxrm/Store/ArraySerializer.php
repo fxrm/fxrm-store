@@ -14,6 +14,10 @@ class ArraySerializer implements Serializer {
         $this->elementSerializer = $elementSerializer;
     }
 
+    function getBackendType() {
+        return array($this->elementSerializer->getBackendType());
+    }
+
     function extern($objArray) {
         $ser = $this->elementSerializer;
 

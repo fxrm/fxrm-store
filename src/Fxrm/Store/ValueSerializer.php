@@ -11,7 +11,6 @@ class ValueSerializer implements Serializer {
     private $class;
     private $propertyMap;
     private $propertyClassMap;
-    private $singlePropertyName;
 
     function __construct($class, EnvironmentStore $store) {
         $classInfo = new \ReflectionClass($class);
@@ -24,6 +23,22 @@ class ValueSerializer implements Serializer {
 
         if (count($this->propertyMap) < 1) {
             throw new \Exception('value class must have at least one property');
+        }
+    }
+
+    function getBackendType() {
+        if (count($this->propertyMap) === 1) {
+            foreach ($this->propertyMap as $n => $prop) {
+                return $this->propertyClassMap[$n]->getBackendType();
+            }
+        } else {
+            $typeMap = array();
+
+            foreach ($this->propertyMap as $n => $prop) {
+                $typeMap[$n] = $this->propertyClassMap[$n]->getBackendType();
+            }
+
+            return $typeMap;
         }
     }
 
