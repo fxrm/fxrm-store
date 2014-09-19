@@ -227,10 +227,14 @@ abstract class PDOBackend extends Backend {
     }
 
     private function fromJSONArray($fieldTypeMap, $data) {
-        $self = $this;
         $type = $fieldTypeMap[0];
+        $result = array();
 
-        return array_map(function ($v) use($self, $type) { return $self->fromJSONValue($type, $v); }, $data);
+        foreach ($data as $v) {
+            $result[] = $this->fromJSONValue($type, $v);
+        }
+
+        return $result;
     }
 
     private function fromJSONMap($fieldTypeMap, $data) {
