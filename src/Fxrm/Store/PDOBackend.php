@@ -202,9 +202,9 @@ abstract class PDOBackend extends Backend {
         }
 
         if (is_array($type)) {
-            return json_encode($this->fromJSONValue($type, $data));
+            return json_encode($this->fromJSONValue($type, $value));
         } else {
-            return $this->fromSimpleValue($type, $data);
+            return $this->fromSimpleValue($type, $value);
         }
     }
 
