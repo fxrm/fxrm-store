@@ -171,26 +171,30 @@ abstract class PDOBackend extends Backend {
 
     private function toJSONValue($fieldType, $data) {
         if (!is_array($fieldType)) {
-            $this->toSimpleValue($fieldType, $data);
+            return $this->toSimpleValue($fieldType, $data);
         } elseif (array_key_exists(0, $fieldType)) {
-            $this->toJSONArray($fieldType, $data);
+            return $this->toJSONArray($fieldType, $data);
         } else {
-            $this->toJSONMap($fieldType, $data);
+            return $this->toJSONMap($fieldType, $data);
         }
     }
 
     private function toJSONArray($fieldTypeMap, $data) {
-        $self = $this;
         $type = $fieldTypeMap[0];
+        $result = array();
 
-        return array_map(function ($v) use($self, $type) { return $self->toJSONValue($type, $v); }, $data);
+        foreach ($data as $v) {
+            $result[] = $this->toJSONValue($type, $v);
+        }
+
+        return $result;
     }
 
     private function toJSONMap($fieldTypeMap, $data) {
         $result = (object)null;
 
-        foreach ($fieldTypeMap as $k => $v) {
-            $result->$k = $this->toJSONValue($fieldTypeMap[$k], $v);
+        foreach ($fieldTypeMap as $k => $type) {
+            $result->$k = $this->toJSONValue($type, $data->$k);
         }
 
         return $result;
@@ -218,11 +222,11 @@ abstract class PDOBackend extends Backend {
 
     private function fromJSONValue($fieldType, $data) {
         if (!is_array($fieldType)) {
-            $this->fromSimpleValue($fieldType, $data);
+            return $this->fromSimpleValue($fieldType, $data);
         } elseif (array_key_exists(0, $fieldType)) {
-            $this->fromJSONArray($fieldType, $data);
+            return $this->fromJSONArray($fieldType, $data);
         } else {
-            $this->fromJSONMap($fieldType, $data);
+            return $this->fromJSONMap($fieldType, $data);
         }
     }
 
@@ -240,8 +244,8 @@ abstract class PDOBackend extends Backend {
     private function fromJSONMap($fieldTypeMap, $data) {
         $result = (object)null;
 
-        foreach ($fieldTypeMap as $k => $v) {
-            $result->$k = $this->fromJSONValue($fieldTypeMap[$k], $v);
+        foreach ($fieldTypeMap as $k => $type) {
+            $result->$k = $this->fromJSONValue($type, $data->$k);
         }
 
         return $result;

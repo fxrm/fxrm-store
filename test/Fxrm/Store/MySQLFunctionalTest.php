@@ -77,8 +77,8 @@ class MySQLFunctionalTest extends \PHPUnit_Framework_TestCase {
 
         $this->backend->set('\\', 'Foo\\MyTestId', 1, array('testProp' => $typeMap), array('testProp' => array((object)array('json!' => 'CHANGED'))));
 
-        $this->assertEquals('', $this->backend->get('\\', 'Foo\\MyTestId', 1, null, 'testProp'));
-        $this->assertEquals('', $this->backend->get('\\', 'Foo\\MyTestId', 1, $typeMap, 'testProp'));
+        $this->assertEquals('[{"json!":"CHANGED"}]', $this->backend->get('\\', 'Foo\\MyTestId', 1, null, 'testProp'));
+        $this->assertEquals(array((object)array('json!' => 'CHANGED')), $this->backend->get('\\', 'Foo\\MyTestId', 1, $typeMap, 'testProp'));
     }
 
     public function testCreate() {
