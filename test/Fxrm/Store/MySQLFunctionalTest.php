@@ -38,38 +38,47 @@ class MySQLFunctionalTest extends \PHPUnit_Framework_TestCase {
     }
 
     public function testSet() {
-        $this->backend->set('\\', 'Foo\\MyTestId', 1, array('testProp' => 'CHANGED'));
-        $this->assertEquals(1, $this->backend->find('\\', 'Foo\\MyTestId', array('testProp' => 'CHANGED'), null, false));
+        $this->backend->set('\\', 'Foo\\MyTestId', 1, array('testProp' => null), array('testProp' => 'CHANGED'));
+        $this->assertEquals(1, $this->backend->find('\\', 'Foo\\MyTestId', array('testProp' => null), array('testProp' => 'CHANGED'), null, false));
     }
 
     public function testMultiFind() {
-        $result = $this->backend->find('\\', 'Foo\\MyTestId', array('testProp' => 'v2'), null, true);
+        $result = $this->backend->find('\\', 'Foo\\MyTestId', array('testProp' => null), array('testProp' => 'v2'), null, true);
         $this->assertEquals(array(2), $result);
     }
 
     public function testMultiFindByDate() {
-        $result = $this->backend->find('\\', 'Foo\\MyTestId', array('testDate' => new \DateTime('1970-01-01 00:00:01 UTC')), null, true);
+        $result = $this->backend->find('\\', 'Foo\\MyTestId', array('testDate' => Backend::DATE_TIME_TYPE), array('testDate' => new \DateTime('1970-01-01 00:00:01 UTC')), null, true);
         $this->assertEquals(array(1), $result);
     }
 
     public function testMultiFindEmpty() {
-        $result = $this->backend->find('\\', 'Foo\\MyTestId', array('testProp' => 'NONEXISTENT'), null, true);
+        $result = $this->backend->find('\\', 'Foo\\MyTestId', array('testProp' => null), array('testProp' => 'NONEXISTENT'), null, true);
         $this->assertEquals(array(), $result);
     }
 
     public function testMultiFindAll() {
-        $result = $this->backend->find('\\', 'Foo\\MyTestId', array(), null, true);
+        $result = $this->backend->find('\\', 'Foo\\MyTestId', array(), array(), null, true);
         $this->assertEquals(array(1, 2), $result);
     }
 
     public function testSingleFind() {
-        $result = $this->backend->find('\\', 'Foo\\MyTestId', array('testProp' => 'v1'), null, false);
+        $result = $this->backend->find('\\', 'Foo\\MyTestId', array('testProp' => null), array('testProp' => 'v1'), null, false);
         $this->assertEquals(1, $result);
     }
 
     public function testSingleFindEmpty() {
-        $result = $this->backend->find('\\', 'Foo\\MyTestId', array('testProp' => 'NONEXISTENT'), null, false);
+        $result = $this->backend->find('\\', 'Foo\\MyTestId', array('testProp' => null), array('testProp' => 'NONEXISTENT'), null, false);
         $this->assertNull($result);
+    }
+
+    public function testSetJSON() {
+        $typeMap = array(array('json!' => null));
+
+        $this->backend->set('\\', 'Foo\\MyTestId', 1, array('testProp' => $typeMap), array('testProp' => array((object)array('json!' => 'CHANGED'))));
+
+        $this->assertEquals('[{"json!":"CHANGED"}]', $this->backend->get('\\', 'Foo\\MyTestId', 1, null, 'testProp'));
+        $this->assertEquals(array((object)array('json!' => 'CHANGED')), $this->backend->get('\\', 'Foo\\MyTestId', 1, $typeMap, 'testProp'));
     }
 
     public function testCreate() {

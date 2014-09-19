@@ -8,6 +8,10 @@ class IdentitySerializerTest extends \PHPUnit_Framework_TestCase {
         $this->s = new IdentitySerializer('Fxrm\\Store\\TESTIDENTITY', null);
     }
 
+    public function testBackendType() {
+        $this->assertSame(null, $this->s->getBackendType());
+    }
+
     public function testExternNull() {
         $this->assertSame(null, $this->s->extern(null));
     }

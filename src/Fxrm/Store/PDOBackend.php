@@ -22,11 +22,11 @@ abstract class PDOBackend extends Backend {
         $this->initPDO($this->pdo);
     }
 
-    final function find($method, $entity, $valueMap, $returnType, $multiple) {
+    final function find($method, $entity, $valueTypeMap, $valueMap, $returnType, $multiple) {
         $stmt = $this->pdo->prepare($this->getCustomQuery($method) ?: $this->generateFindQuery($this->getEntityName($entity), array_keys($valueMap), $multiple));
 
         foreach ($valueMap as $field => $value) {
-            $stmt->bindValue(':' . $field, $this->fromValue($value));
+            $stmt->bindValue(':' . $field, $this->fromValue($valueTypeMap[$field], $value));
         }
 
         $stmt->execute();
@@ -72,14 +72,14 @@ abstract class PDOBackend extends Backend {
         return $this->toValue($fieldType, $rows[0]);
     }
 
-    final function set($method, $entity, $id, $valueMap) {
+    final function set($method, $entity, $id, $valueTypeMap, $valueMap) {
         // @todo use the original model parameter name as query param
         $stmt = $this->pdo->prepare($this->getCustomQuery($method) ?: $this->generateSetQuery($this->getEntityName($entity), array_keys($valueMap)));
         $stmt->bindValue(':id', $id);
 
         $valueCount = 0;
         foreach ($valueMap as $field => $value) {
-            $stmt->bindValue(':' . $field, $this->fromValue($value));
+            $stmt->bindValue(':' . $field, $this->fromValue($valueTypeMap[$field], $value));
             $valueCount += 1;
         }
 
@@ -111,7 +111,7 @@ abstract class PDOBackend extends Backend {
         return $id;
     }
 
-    final function retrieve($querySpecMap, $paramMap, $returnTypeMap) {
+    final function retrieve($querySpecMap, $valueTypeMap, $paramMap, $returnTypeMap) {
         $ns = $this->getImplementationNamespace();
 
         if (!array_key_exists($ns, $querySpecMap)) {
@@ -122,7 +122,7 @@ abstract class PDOBackend extends Backend {
 
         $stmt = $this->pdo->prepare($spec);
         foreach ($paramMap as $field => $value) {
-            $stmt->bindValue(is_int($field) ? $field + 1 : ':' . $field, $this->fromValue($value));
+            $stmt->bindValue(is_int($field) ? $field + 1 : ':' . $field, $this->fromValue($valueTypeMap[$field], $value));
         }
         $stmt->execute();
         $rows = $stmt->fetchAll(\PDO::FETCH_OBJ);
@@ -152,6 +152,16 @@ abstract class PDOBackend extends Backend {
             return null;
         }
 
+        if (is_array($type)) {
+            return $this->toJSONValue($type, json_decode($data, false)); // prefer anonymous objects instead of associative arrays
+        } else {
+            return $this->toSimpleValue($type, $data);
+        }
+
+        return $data;
+    }
+
+    private function toSimpleValue($type, $data) {
         if ($type === Backend::DATE_TIME_TYPE) {
             return $this->internDateTime($data);
         }
@@ -159,16 +169,86 @@ abstract class PDOBackend extends Backend {
         return $data;
     }
 
-    private function fromValue($value) {
+    private function toJSONValue($fieldType, $data) {
+        if (!is_array($fieldType)) {
+            return $this->toSimpleValue($fieldType, $data);
+        } elseif (array_key_exists(0, $fieldType)) {
+            return $this->toJSONArray($fieldType, $data);
+        } else {
+            return $this->toJSONMap($fieldType, $data);
+        }
+    }
+
+    private function toJSONArray($fieldTypeMap, $data) {
+        $type = $fieldTypeMap[0];
+        $result = array();
+
+        foreach ($data as $v) {
+            $result[] = $this->toJSONValue($type, $v);
+        }
+
+        return $result;
+    }
+
+    private function toJSONMap($fieldTypeMap, $data) {
+        $result = (object)null;
+
+        foreach ($fieldTypeMap as $k => $type) {
+            $result->$k = $this->toJSONValue($type, $data->$k);
+        }
+
+        return $result;
+    }
+
+    private function fromValue($type, $value) {
         if ($value === null) {
             return null;
         }
 
-        if ($value instanceof \DateTime) {
+        if (is_array($type)) {
+            return json_encode($this->fromJSONValue($type, $value));
+        } else {
+            return $this->fromSimpleValue($type, $value);
+        }
+    }
+
+    private function fromSimpleValue($type, $value) {
+        if ($type === Backend::DATE_TIME_TYPE) {
             return $this->externDateTime($value);
         }
 
         return $value;
+    }
+
+    private function fromJSONValue($fieldType, $data) {
+        if (!is_array($fieldType)) {
+            return $this->fromSimpleValue($fieldType, $data);
+        } elseif (array_key_exists(0, $fieldType)) {
+            return $this->fromJSONArray($fieldType, $data);
+        } else {
+            return $this->fromJSONMap($fieldType, $data);
+        }
+    }
+
+    private function fromJSONArray($fieldTypeMap, $data) {
+        $type = $fieldTypeMap[0];
+        $result = array();
+
+        foreach ($data as $v) {
+            $result[] = $this->fromJSONValue($type, $v);
+        }
+
+        return $result;
+    }
+
+    private function fromJSONMap($fieldTypeMap, $data) {
+        $result = (object)null;
+
+        foreach ($fieldTypeMap as $k => $type) {
+            $result->$k = $this->fromJSONValue($type, $data->$k);
+        }
+
+        return $result;
     }
 
     private function getEntityName($idClass) {

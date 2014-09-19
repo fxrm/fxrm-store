@@ -19,6 +19,10 @@ class IdentitySerializer implements Serializer {
         $this->fromString = (object)array();
     }
 
+    function getBackendType() {
+        return null;
+    }
+
     function extern($obj) {
         // passthrough null
         if ($obj === null) {

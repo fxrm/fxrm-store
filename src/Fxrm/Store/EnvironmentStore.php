@@ -43,7 +43,7 @@ class EnvironmentStore {
             $this->serializerMap->$valueClass = new ValueSerializer($valueClass, $this);
         }
 
-        $this->serializerMap->DateTime = new PassthroughSerializer();
+        $this->serializerMap->DateTime = new PassthroughSerializer(Backend::DATE_TIME_TYPE);
 
         // copy over the method backend names
         // @todo verify names
@@ -55,6 +55,10 @@ class EnvironmentStore {
     }
 
     function createClassSerializer($className) {
+        if ($className === 'DateTime') {
+            return new PassthroughSerializer(Backend::DATE_TIME_TYPE);
+        }
+
         return $this->isIdentityClass($className) ?
             new IdentitySerializer($className, $this->backendMap->{$this->idClassMap->$className}) :
             new ValueSerializer($className, $this);
@@ -110,28 +114,32 @@ class EnvironmentStore {
         $id = $this->externAny($idClass, $idObj);
 
         $values = array();
+        $valueTypeMap = array();
 
         foreach ($properties as $propertyName => $qualifiedValue) {
             list($propertyClass, $value) = $qualifiedValue;
 
             $values[$propertyName] = $this->externAny($propertyClass, $value);
+            $valueTypeMap[$propertyName] = $this->getBackendType($propertyClass);
         }
 
-        $this->backendMap->$backendName->set($implName, $idClass, $id, $values);
+        $this->backendMap->$backendName->set($implName, $idClass, $id, $valueTypeMap, $values);
     }
 
     function find($backendName, $implName, $returnClass, $fieldClassMap, $properties, $returnArray) {
         $values = array();
+        $valueTypeMap = array();
 
         foreach ($properties as $propertyName => $qualifiedValue) {
             list($propertyClass, $value) = $qualifiedValue;
 
             $values[$propertyName] = $this->externAny($propertyClass, $value);
+            $valueTypeMap[$propertyName] = $this->getBackendType($propertyClass);
         }
 
         $idClass = $this->isIdentityClass($returnClass) ? $returnClass : null;
 
-        $data = $this->backendMap->$backendName->find($implName, $idClass, $values, $fieldClassMap ? $this->getBackendTypeMap($fieldClassMap) : $this->getBackendType($returnClass), $returnArray);
+        $data = $this->backendMap->$backendName->find($implName, $idClass, $valueTypeMap, $values, $fieldClassMap ? $this->getBackendTypeMap($fieldClassMap) : $this->getBackendType($returnClass), $returnArray);
 
         if ($returnArray) {
             if ($fieldClassMap) {
@@ -156,14 +164,16 @@ class EnvironmentStore {
 
     function retrieve($backendName, $querySpecMap, $paramMap, $returnTypeMap) {
         $paramValueMap = array();
+        $paramTypeMap = array();
 
         foreach ($paramMap as $paramName => $paramValue) {
             // @todo find a way to declare param class?
             $paramClass = is_object($paramValue) ? get_class($paramValue) : null;
             $paramValueMap[$paramName] = $this->externAny($paramClass, $paramValue);
+            $paramTypeMap[$paramName] = $this->getBackendType($paramClass);
         }
 
-        $data = $this->backendMap->$backendName->retrieve($querySpecMap, $paramValueMap, $this->getBackendTypeMap($returnTypeMap));
+        $data = $this->backendMap->$backendName->retrieve($querySpecMap, $paramTypeMap, $paramValueMap, $this->getBackendTypeMap($returnTypeMap));
 
         foreach ($data as &$value) {
             foreach ($returnTypeMap as $k => $class) {
@@ -202,7 +212,7 @@ class EnvironmentStore {
     }
 
     private function getBackendType($class) {
-        return $class === 'DateTime' ? Backend::DATE_TIME_TYPE : null;
+        return $this->serializerMap->$class->getBackendType();
     }
 
     private function getBackendTypeMap($classMap) {
