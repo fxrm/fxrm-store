@@ -212,7 +212,7 @@ class EnvironmentStore {
     }
 
     private function getBackendType($class) {
-        return $this->serializerMap->$class->getBackendType();
+        return $class === null ? null : $this->serializerMap->$class->getBackendType();
     }
 
     private function getBackendTypeMap($classMap) {
