@@ -51,7 +51,7 @@ class IdentitySerializer implements Serializer {
 
         if ( ! isset($this->fromString->$id)) {
             $class = '\\' . $this->className; // fully qualified class
-            $obj = new $class();
+            $obj = new $class(); // @todo instead, instantiate with unserialize (convention of skipping constructor validation/security)
 
             $this->fromString->$id = $obj;
             $this->toString[$obj] = $id;

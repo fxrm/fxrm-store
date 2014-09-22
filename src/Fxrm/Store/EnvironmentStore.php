@@ -60,7 +60,7 @@ class EnvironmentStore {
         }
 
         return $this->isIdentityClass($className) ?
-            new IdentitySerializer($className, $this->backendMap->{$this->idClassMap->$className}) :
+            $this->serializerMap->$className : // have to return same instance as everywhere else
             new ValueSerializer($className, $this);
     }
 
