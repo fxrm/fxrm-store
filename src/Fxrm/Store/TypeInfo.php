@@ -41,16 +41,14 @@ class TypeInfo {
      * @return Serializer
      */
     public function createSerializer(EnvironmentStore $store) {
-        if ($this->classInfo === null) {
-            // @todo primitive types
-            return new PassthroughSerializer();
-        } else {
-            $elementSerializer = $store->createClassSerializer($this->classInfo->getName());
+        // @todo primitive types
+        $elementSerializer = $this->classInfo === null
+            ? new PassthroughSerializer()
+            : $store->createClassSerializer($this->classInfo->getName());
 
-            return $this->isArray ?
-                new ArraySerializer($elementSerializer) :
-                $elementSerializer;
-        }
+        return $this->isArray ?
+            new ArraySerializer($elementSerializer) :
+            $elementSerializer;
     }
 
     public function getIsArray() {
