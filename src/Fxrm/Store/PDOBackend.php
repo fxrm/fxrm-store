@@ -221,6 +221,10 @@ abstract class PDOBackend extends Backend {
     }
 
     private function fromJSONValue($fieldType, $data) {
+        if ($data === null) {
+            return null;
+        }
+
         if (!is_array($fieldType)) {
             return $this->fromSimpleValue($fieldType, $data);
         } elseif (array_key_exists(0, $fieldType)) {
