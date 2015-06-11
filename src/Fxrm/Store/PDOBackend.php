@@ -26,7 +26,7 @@ abstract class PDOBackend extends Backend {
         $stmt = $this->pdo->prepare($this->getCustomQuery($method) ?: $this->generateFindQuery($this->getEntityName($entity), array_keys($valueMap), $multiple));
 
         foreach ($valueMap as $field => $value) {
-            $stmt->bindValue(':' . $field, $this->fromValue($valueTypeMap[$field], $value));
+            $this->bindStatementValue($stmt, ':' . $field, $this->fromValue($valueTypeMap[$field], $value));
         }
 
         $stmt->execute();
@@ -56,7 +56,7 @@ abstract class PDOBackend extends Backend {
         $sql = $this->getCustomQuery($method) ?: $this->generateGetQuery($this->getEntityName($entity), $field);
 
         $stmt = $this->pdo->prepare($sql);
-        $stmt->bindValue(':id', $id);
+        $this->bindStatementValue($stmt, ':id', $id);
         $stmt->execute();
 
         // expecting only a single value per row
@@ -75,11 +75,11 @@ abstract class PDOBackend extends Backend {
     final function set($method, $entity, $id, $valueTypeMap, $valueMap) {
         // @todo use the original model parameter name as query param
         $stmt = $this->pdo->prepare($this->getCustomQuery($method) ?: $this->generateSetQuery($this->getEntityName($entity), array_keys($valueMap)));
-        $stmt->bindValue(':id', $id);
+        $this->bindStatementValue($stmt, ':id', $id);
 
         $valueCount = 0;
         foreach ($valueMap as $field => $value) {
-            $stmt->bindValue(':' . $field, $this->fromValue($valueTypeMap[$field], $value));
+            $this->bindStatementValue($stmt, ':' . $field, $this->fromValue($valueTypeMap[$field], $value));
             $valueCount += 1;
         }
 
@@ -100,7 +100,7 @@ abstract class PDOBackend extends Backend {
         $stmt = $this->pdo->prepare($this->generateCreateQuery($this->getEntityName($entity), ($predefinedId !== null)));
 
         if ($predefinedId !== null) {
-            $stmt->bindValue(':id', $predefinedId);
+            $this->bindStatementValue($stmt, ':id', $predefinedId);
         }
 
         $stmt->execute();
@@ -122,7 +122,7 @@ abstract class PDOBackend extends Backend {
 
         $stmt = $this->pdo->prepare($spec);
         foreach ($paramMap as $field => $value) {
-            $stmt->bindValue(is_int($field) ? $field + 1 : ':' . $field, $this->fromValue($valueTypeMap[$field], $value));
+            $this->bindStatementValue($stmt, is_int($field) ? $field + 1 : ':' . $field, $this->fromValue($valueTypeMap[$field], $value));
         }
         $stmt->execute();
         $rows = $stmt->fetchAll(\PDO::FETCH_OBJ);
@@ -279,6 +279,19 @@ abstract class PDOBackend extends Backend {
 
         $sqlConstantName = "$className::$memberName";
         return defined($sqlConstantName) ? constant($sqlConstantName) : null;
+    }
+
+    private function bindStatementValue($stmt, $param, $value) {
+        $stmt->bindValue($param, $value, (
+            is_int($value)
+                ? \PDO::PARAM_INT
+                : (
+                    is_bool($value)
+                        ? \PDO::PARAM_BOOL
+                        : \PDO::PARAM_STR
+                )
+            )
+        );
     }
 
     protected function initPDO(\PDO $pdo) {
