@@ -13,6 +13,7 @@ namespace Fxrm\Store;
 class EnvironmentStore {
     private $backendMap;
     private $serializerMap;
+    private $idSerializerMap;
     private $idClassMap;
     private $methodMap;
 
@@ -31,11 +32,14 @@ class EnvironmentStore {
         // set up serializers
         // @todo verify names
         $this->serializerMap = (object)array();
+        $this->idSerializerMap = (object)array();
         $this->idClassMap = (object)array();
 
         foreach ($idClasses as $idClass => $backendName) {
             $this->idClassMap->$idClass = $backendName;
-            $this->serializerMap->$idClass = new IdentitySerializer($idClass, $this->backendMap->$backendName);
+            $ser = new IdentitySerializer($idClass, $this->backendMap->$backendName);
+            $this->serializerMap->$idClass = $ser;
+            $this->idSerializerMap->$idClass = $ser;
         }
 
         foreach ($valueClasses as $valueClass) {
@@ -61,32 +65,31 @@ class EnvironmentStore {
             return new PassthroughSerializer(Backend::DATE_TIME_TYPE);
         }
 
-        return $this->isIdentityClass($className) ?
-            $this->serializerMap->$className : // have to return same instance as everywhere else
+        return property_exists($this->idSerializerMap, $className) ?
+            $this->idSerializerMap->$className : // have to return same instance as everywhere else
             new ValueSerializer($className, $this);
     }
 
     function extern($obj) {
         $className = get_class($obj);
-        $serializer = $this->serializerMap->$className;
 
         // explicitly deal with identities only - values are not a concern
-        if (!($serializer instanceof IdentitySerializer)) {
+        if ( ! property_exists($this->idSerializerMap, $className)) {
             throw new \Exception('only identities can be externalized'); // developer error
         }
 
         // this will always auto-create data store entries (rows, etc) as necessary
-        return $serializer->extern($obj);
+        return $this->idSerializerMap->$className->extern($obj);
     }
 
     function intern($className, $id) {
         // explicitly deal with identities only - values are not a concern
-        if ( ! $this->isIdentityClass($className)) {
+        if ( ! property_exists($this->idSerializerMap, $className)) {
             throw new \Exception('only identities can be externalized'); // developer error
         }
 
         // explicitly deal with identities only - values are not a concern
-        return $this->serializerMap->$className->intern($id);
+        return $this->idSerializerMap->$className->intern($id);
     }
 
     function getBackendName($implName, $idClass, $firstPropertyName) {
@@ -139,7 +142,7 @@ class EnvironmentStore {
             $valueTypeMap[$propertyName] = $this->getBackendType($propertyClass);
         }
 
-        $idClass = $this->isIdentityClass($returnClass) ? $returnClass : null;
+        $idClass = property_exists($this->idSerializerMap, $returnClass) ? $returnClass : null;
 
         $data = $this->backendMap->$backendName->find($implName, $idClass, $valueTypeMap, $values, $fieldClassMap ? $this->getBackendTypeMap($fieldClassMap) : $this->getBackendType($returnClass), $returnArray);
 
@@ -188,10 +191,6 @@ class EnvironmentStore {
 
     function isSerializableClass($class) {
         return property_exists($this->serializerMap, $class);
-    }
-
-    private function isIdentityClass($class) {
-        return property_exists($this->serializerMap, $class) && $this->serializerMap->$class instanceof IdentitySerializer;
     }
 
     private function internRow($className, $fieldClassMap, $value) {
