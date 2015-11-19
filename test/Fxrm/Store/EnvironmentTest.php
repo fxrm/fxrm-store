@@ -105,6 +105,42 @@ class EnvironmentTest extends \PHPUnit_Framework_TestCase {
         $this->assertSame('Fxrm\\Store\\TEST_ENV_GETTER', $protoMethodInfo->getDeclaringClass()->getName());
     }
 
+    public function testExport() {
+        $this->store->expects($this->any())
+            ->method('extern')->with('TEST_OBJ')
+            ->will($this->returnValue('TEST_STRING'));
+
+        $this->assertSame('TEST_STRING', $this->env->export('TEST_OBJ'));
+    }
+
+    public function testImport() {
+        $this->store->expects($this->any())
+            ->method('intern')->with('TEST_CLASS', 'TEST_STRING')
+            ->will($this->returnValue('TEST_OBJ'));
+
+        $this->assertSame('TEST_OBJ', $this->env->import('TEST_CLASS', 'TEST_STRING'));
+    }
+
+    public function testExportUsing() {
+        $this->store->expects($this->any())
+            ->method('extern')->with('TEST_OBJ')
+            ->will($this->returnValue('TEST_STRING'));
+
+        $impl = $this->env->implement('Fxrm\\Store\\TEST_ENV_EMPTY');
+
+        $this->assertSame('TEST_STRING', $this->env->exportUsing($impl, 'TEST_OBJ'));
+    }
+
+    public function testImportUsing() {
+        $this->store->expects($this->any())
+            ->method('intern')->with('TEST_CLASS', 'TEST_STRING')
+            ->will($this->returnValue('TEST_OBJ'));
+
+        $impl = $this->env->implement('Fxrm\\Store\\TEST_ENV_EMPTY');
+
+        $this->assertSame('TEST_OBJ', $this->env->importUsing($impl, 'TEST_CLASS', 'TEST_STRING'));
+    }
+
     public function testGetter() {
         $this->store->expects($this->any())
             ->method('getBackendName')->with(
