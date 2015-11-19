@@ -7,6 +7,38 @@ class EnvironmentStoreTest extends \PHPUnit_Framework_TestCase {
         $this->backend = $this->getMockBuilder('Fxrm\\Store\\Backend')->getMock();
     }
 
+    public function testSerializerDateTime() {
+        $s = new EnvironmentStore(array(), array(), array(), array());
+
+        $ser = $s->createClassSerializer('DateTime');
+
+        $this->assertInstanceOf('Fxrm\\Store\\PassthroughSerializer', $ser);
+        $this->assertSame(Backend::DATE_TIME_TYPE, $ser->getBackendType());
+    }
+
+    public function testSerializerIdentityIsSame() {
+        $s = new EnvironmentStore(
+            array('TEST_BACKEND' => $this->backend),
+            array('Fxrm\\Store\\TEST_CLASS_ID' => 'TEST_BACKEND'),
+            array(),
+            array()
+        );
+
+        $ser = $s->createClassSerializer('Fxrm\\Store\\TEST_CLASS_ID');
+        $ser2 = $s->createClassSerializer('Fxrm\\Store\\TEST_CLASS_ID');
+
+        $this->assertInstanceOf('Fxrm\\Store\\IdentitySerializer', $ser);
+        $this->assertSame($ser, $ser2);
+    }
+
+    public function testSerializerValue() {
+        $s = new EnvironmentStore(array(), array(), array('Fxrm\\Store\\TEST_CLASS_VALUE'), array());
+
+        $ser = $s->createClassSerializer('Fxrm\\Store\\TEST_CLASS_VALUE');
+        $this->assertInstanceOf('Fxrm\\Store\\ValueSerializer', $ser);
+        $this->assertEquals((object)array('a' => null, 'b' => null), $ser->extern(new TEST_CLASS_VALUE()));
+    }
+
     public function testExternNonIdentity() {
         $s = new EnvironmentStore(array(), array(), array('Fxrm\\Store\\TEST_CLASS_VALUE'), array());
 
@@ -61,6 +93,35 @@ class EnvironmentStoreTest extends \PHPUnit_Framework_TestCase {
         $this->assertInstanceOf('Fxrm\\Store\\TEST_CLASS_ID', $s->intern('Fxrm\\Store\\TEST_CLASS_ID', 'TEST_ID_STRING'));
     }
 
+    public function testBackendNameForUnknown() {
+        $s = new EnvironmentStore(array(), array(), array(), array());
+
+        $this->setExpectedException('Exception');
+        $s->getBackendName('TEST_NS\\TEST_CLASS\\TEST_METHOD', 'Fxrm\\Store\\TEST_CLASS_ID', null);
+    }
+
+    public function testBackendNameByMethodName() {
+        $s = new EnvironmentStore(
+            array('TEST_BACKEND' => $this->backend),
+            array(),
+            array(),
+            array('TEST_NS\\TEST_CLASS\\TEST_METHOD' => 'TEST_BACKEND')
+        );
+
+        $this->assertSame('TEST_BACKEND', $s->getBackendName('TEST_NS\\TEST_CLASS\\TEST_METHOD', 'Fxrm\\Store\\TEST_CLASS_ID', null));
+    }
+
+    public function testBackendNameByIdClass() {
+        $s = new EnvironmentStore(
+            array('TEST_BACKEND' => $this->backend),
+            array('Fxrm\\Store\\TEST_CLASS_ID' => 'TEST_BACKEND'),
+            array(),
+            array()
+        );
+
+        $this->assertSame('TEST_BACKEND', $s->getBackendName('TEST_NS\\TEST_CLASS\\TEST_METHOD', 'Fxrm\\Store\\TEST_CLASS_ID', null));
+    }
+
     public function testDateTimeIsSerializable() {
         $s = new EnvironmentStore(array(), array(), array(), array());
         $this->assertTrue($s->isSerializableClass('DateTime'));
@@ -82,5 +143,5 @@ class EnvironmentStoreTest extends \PHPUnit_Framework_TestCase {
 class TEST_CLASS_OTHER {}
 class TEST_CLASS_ID {}
 class TEST_CLASS_VALUE {
-    private $a;
+    private $a, $b;
 }

@@ -34,6 +34,7 @@ class ValueSerializerTest extends \PHPUnit_Framework_TestCase {
         $this->assertSame('TESTVAL', $this->s->extern(new TESTVALUE()));
     }
 
+    // @todo test garbage-in cases
     public function testIntern() {
         $this->assertSame('TEST2', $this->s->intern('TEST2')->testObtainX());
     }
