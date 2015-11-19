@@ -17,7 +17,10 @@ class DataRowSerializer implements Serializer {
     }
 
     function getBackendType() {
-        throw new \Exception('not externalizable');
+        return array_map(
+            function (Serializer $v) { return $v->getBackendType(); },
+            $this->fieldSerializerMap
+        );
     }
 
     function extern($obj) {

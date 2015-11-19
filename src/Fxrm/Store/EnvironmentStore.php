@@ -161,11 +161,11 @@ class EnvironmentStore {
 
         $idClass = property_exists($this->idSerializerMap, $returnClass) ? $returnClass : null;
 
-        $data = $this->backendMap->$backendName->find($implName, $idClass, $valueTypeMap, $values, $fieldClassMap ? $this->getBackendTypeMap($fieldClassMap) : $this->getAnySerializer($returnClass)->getBackendType(), $returnArray);
-
         $returnElementSerializer = $fieldClassMap !== null
             ? $this->getDataRowSerializer($returnClass, $fieldClassMap)
             : $this->getAnySerializer($returnClass);
+
+        $data = $this->backendMap->$backendName->find($implName, $idClass, $valueTypeMap, $values, $returnElementSerializer->getBackendType(), $returnArray);
 
         $returnSerializer = $returnArray
             ? new ArraySerializer($returnElementSerializer)
@@ -187,15 +187,12 @@ class EnvironmentStore {
             $paramTypeMap[$paramName] = $paramSerializer->getBackendType();
         }
 
-        $data = $this->backendMap->$backendName->retrieve($querySpecMap, $paramTypeMap, $paramValueMap, $this->getBackendTypeMap($returnTypeMap));
+        $returnElementSerializer = $this->getDataRowSerializer('stdClass', $returnTypeMap);
 
-        foreach ($data as &$value) {
-            foreach ($returnTypeMap as $k => $class) {
-                $value->$k = $this->getAnySerializer($class)->intern($value->$k);
-            }
-        }
+        $data = $this->backendMap->$backendName->retrieve($querySpecMap, $paramTypeMap, $paramValueMap, $returnElementSerializer->getBackendType());
 
-        return $data;
+        $returnSerializer = new ArraySerializer($returnElementSerializer);
+        return $returnSerializer->intern($data);
     }
 
     function isSerializableClass($class) {
@@ -215,16 +212,6 @@ class EnvironmentStore {
 
     private function getAnySerializer($class) {
         return $class === null ? $this->primitiveSerializer : $this->createClassSerializer($class);
-    }
-
-    private function getBackendTypeMap($classMap) {
-        return array_map(
-            function (Serializer $v) { return $v->getBackendType(); },
-            array_map(
-                array($this, 'getAnySerializer'),
-                $classMap
-            )
-        );
     }
 }
 
