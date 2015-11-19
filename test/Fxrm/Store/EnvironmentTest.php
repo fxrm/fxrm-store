@@ -48,6 +48,25 @@ class EnvironmentTest extends \PHPUnit_Framework_TestCase {
         $this->assertSame('TEST_ARG_A', $impl->a);
         $this->assertSame('TEST_ARG_B', $impl->b);
     }
+
+    public function testImplementTwice() {
+        $impl = $this->env->implement(
+            'Fxrm\\Store\\TEST_ENV_EMPTY',
+            'TEST_ARG_A',
+            'TEST_ARG_B'
+        );
+
+        $implClass = new \ReflectionClass($impl);
+
+        $impl2 = $this->env->implement(
+            'Fxrm\\Store\\TEST_ENV_EMPTY',
+            'TEST_ARG_C',
+            'TEST_ARG_D'
+        );
+
+        $this->assertNotSame($impl, $impl2);
+        $this->assertTrue($implClass->isInstance($impl2));
+    }
 }
 
 abstract class TEST_ENV_EMPTY {
