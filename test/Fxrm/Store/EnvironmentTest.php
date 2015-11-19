@@ -81,6 +81,18 @@ class EnvironmentTest extends \PHPUnit_Framework_TestCase {
         $this->assertNotSame($impl, $impl2);
         $this->assertTrue($implClass->isInstance($impl2));
     }
+
+    // @todo test grandparent abstract methods as well
+    public function testPreserveNonAbstract() {
+        $impl = $this->env->implement(
+            'Fxrm\\Store\\TEST_ENV_NON_ABSTRACT'
+        );
+
+        $implClass = new \ReflectionClass($impl);
+        $declClass = $implClass->getMethod('nonAbstractMethod')->getDeclaringClass();
+
+        $this->assertSame('Fxrm\\Store\\TEST_ENV_NON_ABSTRACT', $declClass->getName());
+    }
 }
 
 abstract class TEST_ENV_EMPTY {
@@ -93,4 +105,8 @@ abstract class TEST_ENV_EMPTY_WITH_ARGS {
         $this->a = $a;
         $this->b = $b;
     }
+}
+
+abstract class TEST_ENV_NON_ABSTRACT {
+    function nonAbstractMethod() {}
 }
