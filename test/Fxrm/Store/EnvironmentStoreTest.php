@@ -7,6 +7,11 @@ class EnvironmentStoreTest extends \PHPUnit_Framework_TestCase {
         $this->backend = $this->getMockBuilder('Fxrm\\Store\\Backend')->getMock();
     }
 
+    public function testBadBackend() {
+        $this->setExpectedException('Exception');
+        new EnvironmentStore(array('TEST_BACKEND' => new \DateTime()), array(), array(), array());
+    }
+
     public function testSerializerDateTime() {
         $s = new EnvironmentStore(array(), array(), array(), array());
 
@@ -236,6 +241,136 @@ class EnvironmentStoreTest extends \PHPUnit_Framework_TestCase {
         $this->assertCount(2, $result);
         $this->assertSame('TEST_ID_STRING 1', $s->extern($result[0]));
         $this->assertSame('TEST_ID_STRING 2', $s->extern($result[1]));
+    }
+
+    public function testFindRows() {
+        $s = new EnvironmentStore(
+            array('TEST_BACKEND' => $this->backend),
+            array('Fxrm\\Store\\TEST_CLASS_ID' => 'TEST_BACKEND'),
+            array('Fxrm\\Store\\TEST_CLASS_VALUE'),
+            array()
+        );
+
+        $obj = $s->intern('Fxrm\\Store\\TEST_CLASS_ID', 'TEST_ID_STRING');
+
+        $this->backend->expects($this->once())
+            ->method('find')->with(
+                'TEST_NS\\TEST_CLASS\\TEST_METHOD',
+                null,
+                array('TEST_PROPERTY' => array('a' => null, 'b' => null)),
+                array('TEST_PROPERTY' => (object)array('a' => null, 'b' => 'bee')),
+                array(
+                    'TEST_ROW_PROP' => null
+                ),
+                true
+            )
+            ->will($this->returnValue(array(
+                (object)array('TEST_ROW_PROP' => 'TEST_ID_STRING 1'),
+                (object)array('TEST_ROW_PROP' => 'TEST_ID_STRING 2')
+            )));
+
+        $result = $s->find(
+            'TEST_BACKEND',
+            'TEST_NS\\TEST_CLASS\\TEST_METHOD',
+            'stdClass',
+            array(
+                'TEST_ROW_PROP' => 'Fxrm\\Store\\TEST_CLASS_ID'
+            ),
+            array(
+                'TEST_PROPERTY' => array('Fxrm\\Store\\TEST_CLASS_VALUE', new TEST_CLASS_VALUE())
+            ),
+            true
+        );
+
+        $this->assertCount(2, $result);
+        $this->assertSame('stdClass', get_class($result[0]));
+        $this->assertSame('TEST_ID_STRING 1', $s->extern($result[0]->TEST_ROW_PROP));
+        $this->assertSame('stdClass', get_class($result[1]));
+        $this->assertSame('TEST_ID_STRING 2', $s->extern($result[1]->TEST_ROW_PROP));
+    }
+
+    public function testFindSingle() {
+        $s = new EnvironmentStore(
+            array('TEST_BACKEND' => $this->backend),
+            array('Fxrm\\Store\\TEST_CLASS_ID' => 'TEST_BACKEND'),
+            array('Fxrm\\Store\\TEST_CLASS_VALUE'),
+            array()
+        );
+
+        $obj = $s->intern('Fxrm\\Store\\TEST_CLASS_ID', 'TEST_ID_STRING');
+
+        $this->backend->expects($this->once())
+            ->method('find')->with(
+                'TEST_NS\\TEST_CLASS\\TEST_METHOD',
+                'Fxrm\\Store\\TEST_CLASS_ID',
+                array('TEST_PROPERTY' => array('a' => null, 'b' => null)),
+                array('TEST_PROPERTY' => (object)array('a' => null, 'b' => 'bee')),
+                null,
+                false
+            )
+            ->will($this->returnValue('TEST_ID_STRING single'));
+
+        $result = $s->find(
+            'TEST_BACKEND',
+            'TEST_NS\\TEST_CLASS\\TEST_METHOD',
+            'Fxrm\\Store\\TEST_CLASS_ID',
+            null,
+            array(
+                'TEST_PROPERTY' => array('Fxrm\\Store\\TEST_CLASS_VALUE', new TEST_CLASS_VALUE())
+            ),
+            false
+        );
+
+        $this->assertSame('TEST_ID_STRING single', $s->extern($result));
+    }
+
+    public function testFindSingleRow() {
+        $s = new EnvironmentStore(
+            array('TEST_BACKEND' => $this->backend),
+            array('Fxrm\\Store\\TEST_CLASS_ID' => 'TEST_BACKEND'),
+            array('Fxrm\\Store\\TEST_CLASS_VALUE'),
+            array()
+        );
+
+        $obj = $s->intern('Fxrm\\Store\\TEST_CLASS_ID', 'TEST_ID_STRING');
+
+        $this->backend->expects($this->once())
+            ->method('find')->with(
+                'TEST_NS\\TEST_CLASS\\TEST_METHOD',
+                null,
+                array('TEST_PROPERTY' => array('a' => null, 'b' => null)),
+                array('TEST_PROPERTY' => (object)array('a' => null, 'b' => 'bee')),
+                array(
+                    'TEST_ROW_PROP1' => array('a' => null, 'b' => null),
+                    'TEST_ROW_PROP2' => null
+                ),
+                false
+            )
+            ->will($this->returnValue((object)array(
+                'TEST_ROW_PROP1' => (object)array('a' => 'eee', 'b' => 'oooo'),
+                'TEST_ROW_PROP2' => 'TEST_ID_STRING sub'
+            )));
+
+        $result = $s->find(
+            'TEST_BACKEND',
+            'TEST_NS\\TEST_CLASS\\TEST_METHOD',
+            'stdClass',
+            array(
+                'TEST_ROW_PROP1' => 'Fxrm\\Store\\TEST_CLASS_VALUE',
+                'TEST_ROW_PROP2' => 'Fxrm\\Store\\TEST_CLASS_ID'
+            ),
+            array(
+                'TEST_PROPERTY' => array('Fxrm\\Store\\TEST_CLASS_VALUE', new TEST_CLASS_VALUE())
+            ),
+            false
+        );
+
+        $this->assertSame('stdClass', get_class($result));
+        $expectedObject = new TEST_CLASS_VALUE();
+        $expectedObject->a = 'eee';
+        $expectedObject->b = 'oooo';
+        $this->assertEquals($expectedObject, $result->TEST_ROW_PROP1);
+        $this->assertSame('TEST_ID_STRING sub', $s->extern($result->TEST_ROW_PROP2));
     }
 
     public function testRetrieve() {
