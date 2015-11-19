@@ -12,45 +12,6 @@ class EnvironmentStoreTest extends \PHPUnit_Framework_TestCase {
         new EnvironmentStore(array('TEST_BACKEND' => new \DateTime()), array(), array(), array());
     }
 
-    public function testSerializerDateTime() {
-        $s = new EnvironmentStore(array(), array(), array(), array());
-
-        $ser = $s->createClassSerializer('DateTime');
-
-        $this->assertInstanceOf('Fxrm\\Store\\PassthroughSerializer', $ser);
-        $this->assertSame(Backend::DATE_TIME_TYPE, $ser->getBackendType());
-    }
-
-    public function testSerializerIdentityIsSame() {
-        $s = new EnvironmentStore(
-            array('TEST_BACKEND' => $this->backend),
-            array('Fxrm\\Store\\TEST_CLASS_ID' => 'TEST_BACKEND'),
-            array(),
-            array()
-        );
-
-        $ser = $s->createClassSerializer('Fxrm\\Store\\TEST_CLASS_ID');
-        $ser2 = $s->createClassSerializer('Fxrm\\Store\\TEST_CLASS_ID');
-
-        $this->assertInstanceOf('Fxrm\\Store\\IdentitySerializer', $ser);
-        $this->assertSame($ser, $ser2);
-    }
-
-    public function testSerializerValue() {
-        $s = new EnvironmentStore(array(), array(), array('Fxrm\\Store\\TEST_CLASS_VALUE'), array());
-
-        $ser = $s->createClassSerializer('Fxrm\\Store\\TEST_CLASS_VALUE');
-        $this->assertInstanceOf('Fxrm\\Store\\ValueSerializer', $ser);
-        $this->assertEquals((object)array('a' => null, 'b' => 'bee'), $ser->extern(new TEST_CLASS_VALUE()));
-    }
-
-    public function testSerializerUnknown() {
-        $s = new EnvironmentStore(array(), array(), array(), array());
-
-        $this->setExpectedException('Exception');
-        $s->createClassSerializer('Fxrm\\Store\\TEST_CLASS_VALUE');
-    }
-
     public function testExternNonIdentity() {
         $s = new EnvironmentStore(array(), array(), array('Fxrm\\Store\\TEST_CLASS_VALUE'), array());
 

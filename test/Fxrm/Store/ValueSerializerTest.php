@@ -5,12 +5,20 @@ namespace Fxrm\Store;
 class ValueSerializerTest extends \PHPUnit_Framework_TestCase {
     public function setUp() {
         $this->store = $this->getMock('Fxrm\\Store\\EnvironmentStore', array(), array(), '', false);
+
+        $store = $this->store;
+        $this->store->expects($this->any())->method('createSerializer')->will($this->returnCallback(function (TypeInfo $typeInfo) use($store) {
+            $eltSer = $typeInfo->getElementClass() === null
+                ? new PassthroughSerializer()
+                : new ValueSerializer($typeInfo->getElementClass()->getName(), $store);
+
+            return $typeInfo->getIsArray()
+                ? new ArraySerializer($eltSer)
+                : $eltSer;
+        }));
+
         $this->s = new ValueSerializer('Fxrm\\Store\\TESTVALUE', $this->store);
         $this->sub = new ValueSerializer('Fxrm\\Store\\TESTSUBVALUE', $this->store);
-
-        $this->store->expects($this->any())->method('createClassSerializer')->will($this->returnValueMap(array(
-            array('Fxrm\\Store\\TESTVALUE', false, $this->s)
-        )));
 
         $this->s2 = new ValueSerializer('Fxrm\\Store\\TESTCOMPLEXVALUE', $this->store);
     }

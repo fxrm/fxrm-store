@@ -108,7 +108,7 @@ class ValueSerializer implements Serializer {
             $property->setAccessible(true);
 
             $this->propertyMap[$property->getName()] = $property;
-            $this->propertyClassMap[$property->getName()] = $type->createSerializer($store);
+            $this->propertyClassMap[$property->getName()] = $store->createSerializer($type);
         }
     }
 }

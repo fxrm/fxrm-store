@@ -64,7 +64,7 @@ class EnvironmentStore {
     }
 
     // @todo eliminate this in favour of getIdentitySerializer or something
-    function createClassSerializer($className, $allowDataRows = false) {
+    private function createClassSerializer($className, $allowDataRows = false) {
         if (!property_exists($this->classSerializerCacheMap, $className)) {
             if ($allowDataRows) {
                 return new DataRowSerializer($className, $this->getRowFieldSerializerMap($className));
@@ -86,6 +86,14 @@ class EnvironmentStore {
         }
 
         return $this->classSerializerCacheMap->$className;
+    }
+
+    public function createSerializer(TypeInfo $typeInfo) {
+        $elementSerializer = $this->getAnySerializer($typeInfo->getElementClassName());
+
+        return $typeInfo->getIsArray() ?
+            new ArraySerializer($elementSerializer) :
+            $elementSerializer;
     }
 
     function extern($obj) {
@@ -212,7 +220,7 @@ class EnvironmentStore {
             }
 
             $propTypeInfo = TypeInfo::createForProperty($prop);
-            $fieldMap[$prop->getName()] = $propTypeInfo->createSerializer($this);
+            $fieldMap[$prop->getName()] = $this->createSerializer($propTypeInfo);
         }
 
         return $fieldMap;
