@@ -67,7 +67,7 @@ class EnvironmentStore {
     function createClassSerializer($className, $allowDataRows = false) {
         if (!property_exists($this->classSerializerCacheMap, $className)) {
             if ($allowDataRows) {
-                return $this->getDataRowSerializer($className);
+                return new DataRowSerializer($className, $this->getRowFieldSerializerMap($className));
             }
 
             throw new \Exception('not a serializable class');
@@ -190,7 +190,7 @@ class EnvironmentStore {
             $paramTypeMap[$paramName] = $paramSerializer->getBackendType();
         }
 
-        $returnElementSerializer = $this->getDataRowSerializer('stdClass', $returnTypeMap);
+        $returnElementSerializer = new DataRowSerializer('stdClass', $this->getClassSerializerMap($returnTypeMap));
 
         $data = $this->backendMap->$backendName->retrieve($querySpecMap, $paramTypeMap, $paramValueMap, $returnElementSerializer->getBackendType());
 
@@ -198,14 +198,15 @@ class EnvironmentStore {
         return $returnSerializer->intern($data);
     }
 
+    // @todo remove?
     function isSerializableClass($class) {
         return property_exists($this->classSerializerCacheMap, $class);
     }
 
-    private function getRowFieldMap(\ReflectionClass $targetClassInfo) {
+    private function getRowFieldSerializerMap($className) {
+        $targetClassInfo = new \ReflectionClass($className);
         $fieldMap = array();
 
-        // @todo move into DataRowSerializer constructor
         foreach ($targetClassInfo->getProperties() as $prop) {
             if ($prop->isStatic()) {
                 continue;
@@ -216,24 +217,13 @@ class EnvironmentStore {
             }
 
             $propTypeInfo = TypeInfo::createForProperty($prop);
-
-            // @todo support array properties!
-            if ($propTypeInfo->getIsArray()) {
-                throw new \Exception('array properties are not supported here yet');
-            }
-
-            $propClass = $propTypeInfo->getElementClass();
-            $fieldMap[$prop->getName()] = $propClass !== null ? $propClass->getName() : null;
+            $fieldMap[$prop->getName()] = $propTypeInfo->createSerializer($this);
         }
 
         return $fieldMap;
     }
 
-    private function getDataRowSerializer($className, $fieldClassMap = null) {
-        if ($fieldClassMap === null) {
-            $fieldClassMap = $this->getRowFieldMap(new \ReflectionClass($className));
-        }
-
+    private function getClassSerializerMap($fieldClassMap) {
         $fieldSerializerMap = array();
 
         // copying strictly only the defined properties
@@ -241,7 +231,7 @@ class EnvironmentStore {
             $fieldSerializerMap[$k] = $this->getAnySerializer($class);
         }
 
-        return new DataRowSerializer($className, $fieldSerializerMap);
+        return $fieldSerializerMap;
     }
 
     /** @return Serializer */
