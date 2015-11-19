@@ -104,9 +104,38 @@ class EnvironmentTest extends \PHPUnit_Framework_TestCase {
         $this->assertSame($implClass->getName(), $implMethodInfo->getDeclaringClass()->getName());
         $this->assertSame('Fxrm\\Store\\TEST_ENV_GETTER', $protoMethodInfo->getDeclaringClass()->getName());
     }
+
+    public function testGetter() {
+        $this->store->expects($this->any())
+            ->method('getBackendName')->with(
+                'Fxrm\\Store\\TEST_ENV_GETTER\\getTEST_ENV_TestProperty',
+                'Fxrm\\Store\\TEST_ENV_Id',
+                'testProperty'
+            )
+            ->will($this->returnValue('TEST_BACKEND'));
+
+        $id = new TEST_ENV_Id();
+        $impl = $this->env->implement('Fxrm\\Store\\TEST_ENV_GETTER');
+
+        $this->store->expects($this->once())
+            ->method('get')->with(
+                'TEST_BACKEND',
+                'Fxrm\\Store\\TEST_ENV_GETTER\\getTEST_ENV_TestProperty',
+                'Fxrm\\Store\\TEST_ENV_Id',
+                $id,
+                'Fxrm\\Store\\TEST_ENV_VALUE',
+                'testProperty'
+            )
+            ->will($this->returnValue('TEST_VALUE'));
+
+        $val = $impl->getTEST_ENV_TestProperty($id);
+
+        $this->assertSame('TEST_VALUE', $val);
+    }
 }
 
 class TEST_ENV_Id {}
+class TEST_ENV_VALUE {}
 
 abstract class TEST_ENV_EMPTY {
 }
@@ -125,7 +154,7 @@ abstract class TEST_ENV_NON_ABSTRACT {
 }
 
 interface TEST_ENV_GETTER {
-    function getTEST_ENV_TestProperty(TEST_ENV_Id $id);
+    /** @return TEST_ENV_VALUE */ function getTEST_ENV_TestProperty(TEST_ENV_Id $id);
 }
 
 abstract class TEST_ENV_DERIVED_OF_GETTER implements TEST_ENV_GETTER {
