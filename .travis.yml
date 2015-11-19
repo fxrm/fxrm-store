@@ -9,6 +9,6 @@ before_script:
   - sh -c "mysql -e 'create database myapp_test default character set utf8 default collate utf8_general_ci'"
 
 install:
-  - composer install --no-dev
+  - composer install
 
 script: phpunit --bootstrap vendor/autoload.php test
