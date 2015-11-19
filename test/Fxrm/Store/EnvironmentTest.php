@@ -82,7 +82,6 @@ class EnvironmentTest extends \PHPUnit_Framework_TestCase {
         $this->assertTrue($implClass->isInstance($impl2));
     }
 
-    // @todo test grandparent abstract methods as well
     public function testPreserveNonAbstract() {
         $impl = $this->env->implement(
             'Fxrm\\Store\\TEST_ENV_NON_ABSTRACT'
@@ -93,7 +92,21 @@ class EnvironmentTest extends \PHPUnit_Framework_TestCase {
 
         $this->assertSame('Fxrm\\Store\\TEST_ENV_NON_ABSTRACT', $declClass->getName());
     }
+
+    public function testImplementParentMethods() {
+        $impl = $this->env->implement('Fxrm\\Store\\TEST_ENV_DERIVED_OF_GETTER');
+        $implClass = new \ReflectionClass($impl);
+        $implMethodInfo = $implClass->getMethod('getTEST_ENV_TestProperty');
+        $protoMethodInfo = $implMethodInfo->getPrototype();
+
+        $this->assertSame('Fxrm\\Store\\TEST_ENV_DERIVED_OF_GETTER', $implClass->getParentClass()->getName());
+
+        $this->assertSame($implClass->getName(), $implMethodInfo->getDeclaringClass()->getName());
+        $this->assertSame('Fxrm\\Store\\TEST_ENV_GETTER', $protoMethodInfo->getDeclaringClass()->getName());
+    }
 }
+
+class TEST_ENV_Id {}
 
 abstract class TEST_ENV_EMPTY {
 }
@@ -109,4 +122,11 @@ abstract class TEST_ENV_EMPTY_WITH_ARGS {
 
 abstract class TEST_ENV_NON_ABSTRACT {
     function nonAbstractMethod() {}
+}
+
+interface TEST_ENV_GETTER {
+    function getTEST_ENV_TestProperty(TEST_ENV_Id $id);
+}
+
+abstract class TEST_ENV_DERIVED_OF_GETTER implements TEST_ENV_GETTER {
 }
