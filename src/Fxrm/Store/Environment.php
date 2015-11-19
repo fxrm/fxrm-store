@@ -74,19 +74,17 @@ class Environment {
         $implementationSource[] = '{ private $s;';
 
         // implement constructor
+        // @todo properly get grandparent constructor if parent is empty
         $constructorInfo = $classInfo->getConstructor();
+        $count = $constructorInfo ? count($constructorInfo->getParameters()) : 0;
 
         $implementationSource[] = 'function __construct($s, $args) {';
         $implementationSource[] = '$this->s = $s;'; // this must be set before calling parent
 
+        $implementationSource[] = 'if (count($args) !== ' . $count . ') { throw new \\Exception(\'wrong constructor arg count\'); }';
+
         if ($constructorInfo) {
             $implementationSource[] = 'parent::__construct(';
-
-            $count = count($constructorInfo->getParameters());
-
-            if (count($constructArguments) !== $count) {
-                throw new \Exception('expecting ' . $count . ' constructor argument(s)');
-            }
 
             if ($count > 0) {
                 foreach (range(0, $count - 1) as $i) {

@@ -38,6 +38,14 @@ class EnvironmentTest extends \PHPUnit_Framework_TestCase {
         $this->assertInstanceOf('Fxrm\\Store\\TEST_ENV_EMPTY', $impl);
     }
 
+    public function testImplementNoConstructorMismatchingArgs() {
+        $this->setExpectedException('Exception');
+        $this->env->implement(
+            'Fxrm\\Store\\TEST_ENV_EMPTY',
+            'TEST_ARG'
+        );
+    }
+
     public function testImplementMismatchingArgs() {
         $this->setExpectedException('Exception');
         $this->env->implement('Fxrm\\Store\\TEST_ENV_EMPTY_WITH_ARGS');
