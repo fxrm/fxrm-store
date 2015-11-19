@@ -64,8 +64,12 @@ class EnvironmentStore {
     }
 
     // @todo eliminate this in favour of getIdentitySerializer or something
-    function createClassSerializer($className) {
+    function createClassSerializer($className, $allowDataRows = false) {
         if (!property_exists($this->classSerializerCacheMap, $className)) {
+            if ($allowDataRows) {
+                return $this->getDataRowSerializer($className);
+            }
+
             throw new \Exception('not a serializable class');
         }
 
@@ -147,7 +151,7 @@ class EnvironmentStore {
         $this->backendMap->$backendName->set($implName, $idClass, $id, $valueTypeMap, $values);
     }
 
-    function find($backendName, $implName, $returnClass, $fieldClassMap, $properties, $returnArray) {
+    function find($backendName, $implName, $returnClass, $properties, $returnArray) {
         $values = array();
         $valueTypeMap = array();
 
@@ -161,9 +165,8 @@ class EnvironmentStore {
 
         $idClass = property_exists($this->idSerializerMap, $returnClass) ? $returnClass : null;
 
-        $returnElementSerializer = $fieldClassMap !== null
-            ? $this->getDataRowSerializer($returnClass, $fieldClassMap)
-            : $this->getAnySerializer($returnClass);
+        // get return parser, allowing for data row mode
+        $returnElementSerializer = $this->getAnySerializer($returnClass, true);
 
         $data = $this->backendMap->$backendName->find($implName, $idClass, $valueTypeMap, $values, $returnElementSerializer->getBackendType(), $returnArray);
 
@@ -199,7 +202,38 @@ class EnvironmentStore {
         return property_exists($this->classSerializerCacheMap, $class);
     }
 
-    private function getDataRowSerializer($className, $fieldClassMap) {
+    private function getRowFieldMap(\ReflectionClass $targetClassInfo) {
+        $fieldMap = array();
+
+        // @todo move into DataRowSerializer constructor
+        foreach ($targetClassInfo->getProperties() as $prop) {
+            if ($prop->isStatic()) {
+                continue;
+            }
+
+            if ( ! $prop->isPublic()) {
+                throw new \Exception('row object must only contain public properties');
+            }
+
+            $propTypeInfo = TypeInfo::createForProperty($prop);
+
+            // @todo support array properties!
+            if ($propTypeInfo->getIsArray()) {
+                throw new \Exception('array properties are not supported here yet');
+            }
+
+            $propClass = $propTypeInfo->getElementClass();
+            $fieldMap[$prop->getName()] = $propClass !== null ? $propClass->getName() : null;
+        }
+
+        return $fieldMap;
+    }
+
+    private function getDataRowSerializer($className, $fieldClassMap = null) {
+        if ($fieldClassMap === null) {
+            $fieldClassMap = $this->getRowFieldMap(new \ReflectionClass($className));
+        }
+
         $fieldSerializerMap = array();
 
         // copying strictly only the defined properties
@@ -210,8 +244,11 @@ class EnvironmentStore {
         return new DataRowSerializer($className, $fieldSerializerMap);
     }
 
-    private function getAnySerializer($class) {
-        return $class === null ? $this->primitiveSerializer : $this->createClassSerializer($class);
+    /** @return Serializer */
+    private function getAnySerializer($class, $allowDataRows = false) {
+        return $class === null
+            ? $this->primitiveSerializer
+            : $this->createClassSerializer($class, $allowDataRows);
     }
 }
 

@@ -270,7 +270,6 @@ class Environment {
         $source[] = var_export($backendName, true) . ', ';
         $source[] = var_export($signature->fullName, true) . ', ';
         $source[] = var_export($signature->returnTypeInfo->getElementClassName(), true) . ', ';
-        $source[] = var_export($this->getRowFieldMap($signature->returnTypeInfo), true) . ', ';
         $source[] = 'array(';
 
         $count = 0;
@@ -290,40 +289,6 @@ class Environment {
         $source[] = '}';
 
         return join('', $source);
-    }
-
-    private function getRowFieldMap(TypeInfo $typeInfo) {
-        $targetClassInfo = $typeInfo->getElementClass();
-
-        // ignore primitives and serializable classes
-        if ($targetClassInfo === null || $this->store->isSerializableClass($targetClassInfo->getName())) {
-            return null;
-        }
-
-        $fieldMap = array();
-
-        // @todo move into DataRowSerializer constructor
-        foreach ($targetClassInfo->getProperties() as $prop) {
-            if ($prop->isStatic()) {
-                continue;
-            }
-
-            if ( ! $prop->isPublic()) {
-                throw new \Exception('row object must only contain public properties');
-            }
-
-            $propTypeInfo = TypeInfo::createForProperty($prop);
-
-            // @todo support array properties!
-            if ($propTypeInfo->getIsArray()) {
-                throw new \Exception('array properties are not supported here yet');
-            }
-
-            $propClass = $propTypeInfo->getElementClass();
-            $fieldMap[$prop->getName()] = $propClass !== null ? $propClass->getName() : null;
-        }
-
-        return $fieldMap;
     }
 
     private function getSignature(\ReflectionMethod $info) {

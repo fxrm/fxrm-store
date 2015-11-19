@@ -9,7 +9,7 @@ class ValueSerializerTest extends \PHPUnit_Framework_TestCase {
         $this->sub = new ValueSerializer('Fxrm\\Store\\TESTSUBVALUE', $this->store);
 
         $this->store->expects($this->any())->method('createClassSerializer')->will($this->returnValueMap(array(
-            array('Fxrm\\Store\\TESTVALUE', $this->s)
+            array('Fxrm\\Store\\TESTVALUE', false, $this->s)
         )));
 
         $this->s2 = new ValueSerializer('Fxrm\\Store\\TESTCOMPLEXVALUE', $this->store);
