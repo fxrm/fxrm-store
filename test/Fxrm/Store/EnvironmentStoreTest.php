@@ -237,10 +237,50 @@ class EnvironmentStoreTest extends \PHPUnit_Framework_TestCase {
         $this->assertSame('TEST_ID_STRING 1', $s->extern($result[0]));
         $this->assertSame('TEST_ID_STRING 2', $s->extern($result[1]));
     }
+
+    public function testRetrieve() {
+        $s = new EnvironmentStore(
+            array('TEST_BACKEND' => $this->backend),
+            array('Fxrm\\Store\\TEST_CLASS_ID' => 'TEST_BACKEND'),
+            array('Fxrm\\Store\\TEST_CLASS_VALUE'),
+            array()
+        );
+
+        $obj = $s->intern('Fxrm\\Store\\TEST_CLASS_ID', 'TEST_ID_STRING');
+
+        $this->backend->expects($this->once())
+            ->method('retrieve')->with(
+                'TEST_QUERY_SPEC_MAP',
+                array('TEST_PARAM' => array('a' => null, 'b' => null)),
+                array('TEST_PARAM' => (object)array('a' => null, 'b' => 'bee')),
+                array('TEST_RESULT_PROP' => array('a' => null, 'b' => null))
+            )
+            ->will($this->returnValue(array(
+                (object)array('TEST_RESULT_PROP' => (object)array('a' => 'aaa', 'b' => null))
+            )));
+
+        $result = $s->retrieve(
+            'TEST_BACKEND',
+            'TEST_QUERY_SPEC_MAP',
+            array(
+                'TEST_PARAM' => new TEST_CLASS_VALUE()
+            ),
+            array(
+                'TEST_RESULT_PROP' => 'Fxrm\\Store\\TEST_CLASS_VALUE'
+            )
+        );
+
+        $this->assertCount(1, $result);
+
+        $expectedObject = new TEST_CLASS_VALUE();
+        $expectedObject->a = 'aaa';
+        $expectedObject->b = null;
+        $this->assertEquals($expectedObject, $result[0]->TEST_RESULT_PROP);
+    }
 }
 
 class TEST_CLASS_OTHER {}
 class TEST_CLASS_ID {}
 class TEST_CLASS_VALUE {
-    private $a, $b = 'bee';
+    public $a, $b = 'bee';
 }
