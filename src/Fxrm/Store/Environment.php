@@ -16,6 +16,8 @@ namespace Fxrm\Store;
 class Environment {
     private static $PRIMITIVE_TYPES = array('string', 'integer', 'int'); // @todo add more
 
+    /** @var EnvironmentStore */ private $store;
+
     /**
      * Initialize the storage environment context with implementation hints.
      * Implementation hints are a JSON object with the following keys:
