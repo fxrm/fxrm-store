@@ -177,6 +177,93 @@ class EnvironmentTest extends \PHPUnit_Framework_TestCase {
         $this->assertSame('TEST_VALUE', $val);
     }
 
+    public function testGetterUndecorated() {
+        $this->store->expects($this->any())
+            ->method('getBackendName')->with(
+                'Fxrm\\Store\\TEST_ENV_GETTER_UNDECORATED\\getTEST_ENV_TestProperty',
+                'Fxrm\\Store\\TEST_ENV_Id',
+                'testProperty'
+            )
+            ->will($this->returnValue('TEST_BACKEND'));
+
+        $this->store->expects($this->any())
+            ->method('isSerializableClass')
+            ->will($this->returnValue(true));
+
+        $id = new TEST_ENV_Id();
+        $impl = $this->env->implement('Fxrm\\Store\\TEST_ENV_GETTER_UNDECORATED');
+
+        $this->store->expects($this->once())
+            ->method('get')->with(
+                'TEST_BACKEND',
+                'Fxrm\\Store\\TEST_ENV_GETTER_UNDECORATED\\getTEST_ENV_TestProperty',
+                'Fxrm\\Store\\TEST_ENV_Id',
+                $id,
+                null,
+                'testProperty'
+            );
+
+        $impl->getTEST_ENV_TestProperty($id);
+    }
+
+    public function testGetterInt() {
+        $this->store->expects($this->any())
+            ->method('getBackendName')->with(
+                'Fxrm\\Store\\TEST_ENV_GETTER_INT\\getTEST_ENV_TestProperty',
+                'Fxrm\\Store\\TEST_ENV_Id',
+                'testProperty'
+            )
+            ->will($this->returnValue('TEST_BACKEND'));
+
+        $this->store->expects($this->any())
+            ->method('isSerializableClass')
+            ->will($this->returnValue(true));
+
+        $id = new TEST_ENV_Id();
+        $impl = $this->env->implement('Fxrm\\Store\\TEST_ENV_GETTER_INT');
+
+        $this->store->expects($this->once())
+            ->method('get')->with(
+                'TEST_BACKEND',
+                'Fxrm\\Store\\TEST_ENV_GETTER_INT\\getTEST_ENV_TestProperty',
+                'Fxrm\\Store\\TEST_ENV_Id',
+                $id,
+                null,
+                'testProperty'
+            );
+
+        $impl->getTEST_ENV_TestProperty($id);
+    }
+
+    public function testGetterObject() {
+        $this->store->expects($this->any())
+            ->method('getBackendName')->with(
+                'Fxrm\\Store\\TEST_ENV_GETTER_OBJECT\\getTEST_ENV_TestProperty',
+                'Fxrm\\Store\\TEST_ENV_Id',
+                'testProperty'
+            )
+            ->will($this->returnValue('TEST_BACKEND'));
+
+        $this->store->expects($this->any())
+            ->method('isSerializableClass')
+            ->will($this->returnValue(true));
+
+        $id = new TEST_ENV_Id();
+        $impl = $this->env->implement('Fxrm\\Store\\TEST_ENV_GETTER_OBJECT');
+
+        $this->store->expects($this->once())
+            ->method('get')->with(
+                'TEST_BACKEND',
+                'Fxrm\\Store\\TEST_ENV_GETTER_OBJECT\\getTEST_ENV_TestProperty',
+                'Fxrm\\Store\\TEST_ENV_Id',
+                $id,
+                '\\stdClass',
+                'testProperty'
+            );
+
+        $impl->getTEST_ENV_TestProperty($id);
+    }
+
     public function testGetterExtraArgs() {
         $this->setExpectedException('Exception');
         $this->env->implement('Fxrm\\Store\\TEST_ENV_GETTER_EXTRA_ARGS');
@@ -366,6 +453,18 @@ interface TEST_ENV_GETTER_NON_ID {
 
 interface TEST_ENV_GETTER_MISNAMED {
     /** @return TEST_ENV_VALUE */ function getEXTRA_TEST_ENV_TestProperty(TEST_ENV_Id $id);
+}
+
+interface TEST_ENV_GETTER_UNDECORATED {
+    function getTEST_ENV_TestProperty(TEST_ENV_Id $id);
+}
+
+interface TEST_ENV_GETTER_INT {
+    /** @return int */ function getTEST_ENV_TestProperty(TEST_ENV_Id $id);
+}
+
+interface TEST_ENV_GETTER_OBJECT {
+    /** @return object */ function getTEST_ENV_TestProperty(TEST_ENV_Id $id);
 }
 
 abstract class TEST_ENV_DERIVED_OF_GETTER implements TEST_ENV_GETTER {
