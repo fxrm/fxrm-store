@@ -177,6 +177,38 @@ class EnvironmentTest extends \PHPUnit_Framework_TestCase {
         $this->assertSame('TEST_VALUE', $val);
     }
 
+    public function testGetterExtraArgs() {
+        $this->setExpectedException('Exception');
+        $this->env->implement('Fxrm\\Store\\TEST_ENV_GETTER_EXTRA_ARGS');
+    }
+
+    public function testGetterArray() {
+        $this->setExpectedException('Exception');
+        $this->env->implement('Fxrm\\Store\\TEST_ENV_GETTER_ARRAY');
+    }
+
+    public function testGetterRow() {
+        // non-serializable class is interpreted as row object
+        $this->store->expects($this->any())
+            ->method('isSerializableClass')
+            ->will($this->returnValue(false));
+
+        $this->setExpectedException('Exception');
+        $this->env->implement('Fxrm\\Store\\TEST_ENV_GETTER_ROW');
+    }
+
+    public function testGetterNonId() {
+        // @todo a more specific error class
+        $this->setExpectedException('Exception');
+        $this->env->implement('Fxrm\\Store\\TEST_ENV_GETTER_NON_ID');
+    }
+
+    public function testGetterMisnamed() {
+        // @todo a more specific error class
+        $this->setExpectedException('Exception');
+        $this->env->implement('Fxrm\\Store\\TEST_ENV_GETTER_MISNAMED');
+    }
+
     public function testSetter() {
         $this->store->expects($this->any())
             ->method('getBackendName')->with(
@@ -207,6 +239,12 @@ class EnvironmentTest extends \PHPUnit_Framework_TestCase {
             ->will($this->returnValue('TEST_VALUE'));
 
         $impl->testSetterMethod($id, $val);
+    }
+
+    public function testSetterFewArgs() {
+        // @todo a more specific error class
+        $this->setExpectedException('Exception');
+        $this->env->implement('Fxrm\\Store\\TEST_ENV_SETTER_FEW_ARGS');
     }
 
     public function testFinder() {
@@ -246,6 +284,7 @@ class EnvironmentTest extends \PHPUnit_Framework_TestCase {
 // using random field value to help find mismatch during assertions
 class TEST_ENV_Id { function __construct() { $this->v = rand(); } }
 class TEST_ENV_VALUE { function __construct() { $this->v = rand(); } }
+class TEST_ENV_ROW { public $a; }
 
 abstract class TEST_ENV_EMPTY {
 }
@@ -267,11 +306,35 @@ interface TEST_ENV_GETTER {
     /** @return TEST_ENV_VALUE */ function getTEST_ENV_TestProperty(TEST_ENV_Id $id);
 }
 
+interface TEST_ENV_GETTER_EXTRA_ARGS {
+    /** @return TEST_ENV_VALUE */ function getTEST_ENV_TestProperty(TEST_ENV_Id $id, TEST_ENV_VALUE $extraArg);
+}
+
+interface TEST_ENV_GETTER_ARRAY {
+    /** @return TEST_ENV_VALUE[] */ function getTEST_ENV_TestProperty(TEST_ENV_Id $id);
+}
+
+interface TEST_ENV_GETTER_ROW {
+    /** @return TEST_ENV_ROW */ function getTEST_ENV_TestProperty(TEST_ENV_Id $id);
+}
+
+interface TEST_ENV_GETTER_NON_ID {
+    /** @return TEST_ENV_VALUE */ function getTEST_ENV_TestProperty(TEST_ENV_VALUE $val);
+}
+
+interface TEST_ENV_GETTER_MISNAMED {
+    /** @return TEST_ENV_VALUE */ function getEXTRA_TEST_ENV_TestProperty(TEST_ENV_Id $id);
+}
+
 abstract class TEST_ENV_DERIVED_OF_GETTER implements TEST_ENV_GETTER {
 }
 
 interface TEST_ENV_SETTER {
     function testSetterMethod(TEST_ENV_Id $testId, TEST_ENV_VALUE $testProperty);
+}
+
+interface TEST_ENV_SETTER_FEW_ARGS {
+    function testSetterMethod(TEST_ENV_Id $testId);
 }
 
 interface TEST_ENV_FINDER {
