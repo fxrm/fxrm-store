@@ -295,12 +295,9 @@ class Environment {
     private function getRowFieldMap(TypeInfo $typeInfo) {
         $targetClassInfo = $typeInfo->getElementClass();
 
-        if ($targetClassInfo === null) {
+        // ignore primitives and serializable classes
+        if ($targetClassInfo === null || $this->store->isSerializableClass($targetClassInfo->getName())) {
             return null;
-        }
-
-        if ($this->store->isSerializableClass($targetClassInfo->getName())) {
-            throw new \Exception('cannot use serializable class as row object');
         }
 
         $fieldMap = array();
