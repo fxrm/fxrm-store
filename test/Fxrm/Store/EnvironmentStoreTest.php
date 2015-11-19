@@ -200,6 +200,43 @@ class EnvironmentStoreTest extends \PHPUnit_Framework_TestCase {
             )
         );
     }
+
+    public function testFind() {
+        $s = new EnvironmentStore(
+            array('TEST_BACKEND' => $this->backend),
+            array('Fxrm\\Store\\TEST_CLASS_ID' => 'TEST_BACKEND'),
+            array('Fxrm\\Store\\TEST_CLASS_VALUE'),
+            array()
+        );
+
+        $obj = $s->intern('Fxrm\\Store\\TEST_CLASS_ID', 'TEST_ID_STRING');
+
+        $this->backend->expects($this->once())
+            ->method('find')->with(
+                'TEST_NS\\TEST_CLASS\\TEST_METHOD',
+                'Fxrm\\Store\\TEST_CLASS_ID',
+                array('TEST_PROPERTY' => array('a' => null, 'b' => null)),
+                array('TEST_PROPERTY' => (object)array('a' => null, 'b' => 'bee')),
+                null,
+                true
+            )
+            ->will($this->returnValue(array('TEST_ID_STRING 1', 'TEST_ID_STRING 2')));
+
+        $result = $s->find(
+            'TEST_BACKEND',
+            'TEST_NS\\TEST_CLASS\\TEST_METHOD',
+            'Fxrm\\Store\\TEST_CLASS_ID',
+            null,
+            array(
+                'TEST_PROPERTY' => array('Fxrm\\Store\\TEST_CLASS_VALUE', new TEST_CLASS_VALUE())
+            ),
+            true
+        );
+
+        $this->assertCount(2, $result);
+        $this->assertSame('TEST_ID_STRING 1', $s->extern($result[0]));
+        $this->assertSame('TEST_ID_STRING 2', $s->extern($result[1]));
+    }
 }
 
 class TEST_CLASS_OTHER {}
