@@ -4,7 +4,7 @@ namespace Fxrm\Store;
 
 class MySQLFunctionalTest extends \PHPUnit_Framework_TestCase {
     public function setUp() {
-        $dsn = getenv('TEST_MYSQL_DSN') ?: 'mysql:host=127.0.0.1;port=8889;dbname=fxrm_test';
+        $dsn = getenv('TEST_MYSQL_DSN') ?: 'mysql:host=127.0.0.1;port=8889';
         $user = getenv('TEST_MYSQL_USER') !== false ? getenv('TEST_MYSQL_USER') : 'root';
         $password = getenv('TEST_MYSQL_PASSWORD') !== false ? getenv('TEST_MYSQL_PASSWORD') : 'root';
 
@@ -12,6 +12,8 @@ class MySQLFunctionalTest extends \PHPUnit_Framework_TestCase {
         $this->pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
 
         $this->pdo->exec('
+            create database myapp_test default character set utf8 default collate utf8_general_ci;
+            use myapp_test;
             create table MyTest (id INT PRIMARY KEY AUTO_INCREMENT, testProp VARCHAR(255) NULL, testDate INT NULL);
             insert into MyTest (testProp, testDate) VALUES (\'v1\', 1), (\'v2\', 2);
         ');
@@ -23,6 +25,7 @@ class MySQLFunctionalTest extends \PHPUnit_Framework_TestCase {
         if ($this->pdo) {
             $this->pdo->exec('
                 drop table MyTest;
+                drop database myapp_test;
             ');
         }
     }

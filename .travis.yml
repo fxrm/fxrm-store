@@ -3,10 +3,7 @@ language: php
 php:
   - 5.3
 
-env: TEST_MYSQL_DSN="mysql:host=127.0.0.1;dbname=myapp_test" TEST_MYSQL_USER=travis TEST_MYSQL_PASSWORD=""
-
-before_script:
-  - sh -c "mysql -e 'create database myapp_test default character set utf8 default collate utf8_general_ci'"
+env: TEST_MYSQL_DSN="mysql:host=127.0.0.1" TEST_MYSQL_USER=travis TEST_MYSQL_PASSWORD=""
 
 install:
   - composer install
