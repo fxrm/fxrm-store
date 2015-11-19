@@ -279,12 +279,54 @@ class EnvironmentTest extends \PHPUnit_Framework_TestCase {
 
         $this->assertSame('TEST_VALUE', $impl->testFinderMethod($val));
     }
+
+    public function testFinderRowStatic() {
+        $this->store->expects($this->any())
+            ->method('getBackendName')->with(
+                'Fxrm\\Store\\TEST_ENV_FINDER_ROW_STATIC\\testFinderMethod',
+                'Fxrm\\Store\\TEST_ENV_ROW_STATIC',
+                null
+            )
+            ->will($this->returnValue('TEST_BACKEND'));
+
+        $this->store->expects($this->any())
+            ->method('isSerializableClass')
+            ->will($this->returnValue(false));
+
+        $val = new TEST_ENV_VALUE();
+        $impl = $this->env->implement('Fxrm\\Store\\TEST_ENV_FINDER_ROW_STATIC');
+
+        $this->store->expects($this->once())
+            ->method('find')->with(
+                'TEST_BACKEND',
+                'Fxrm\\Store\\TEST_ENV_FINDER_ROW_STATIC\\testFinderMethod',
+                'Fxrm\\Store\\TEST_ENV_ROW_STATIC',
+                array(
+                    'a' => null
+                ),
+                array(
+                    'testProperty' => array('Fxrm\\Store\\TEST_ENV_VALUE', $val)
+                ),
+                false
+            )
+            ->will($this->returnValue('TEST_VALUE'));
+
+        $this->assertSame('TEST_VALUE', $impl->testFinderMethod($val));
+    }
+
+    public function testFinderRowPrivate() {
+        // @todo a more specific error class
+        $this->setExpectedException('Exception');
+        $this->env->implement('Fxrm\\Store\\TEST_ENV_FINDER_ROW_PRIVATE');
+    }
 }
 
 // using random field value to help find mismatch during assertions
 class TEST_ENV_Id { function __construct() { $this->v = rand(); } }
 class TEST_ENV_VALUE { function __construct() { $this->v = rand(); } }
 class TEST_ENV_ROW { public $a; }
+class TEST_ENV_ROW_STATIC { public static $s; public $a; }
+class TEST_ENV_ROW_PRIVATE { private $a; }
 
 abstract class TEST_ENV_EMPTY {
 }
@@ -339,4 +381,12 @@ interface TEST_ENV_SETTER_FEW_ARGS {
 
 interface TEST_ENV_FINDER {
     /** @return TEST_ENV_Id */ function testFinderMethod(TEST_ENV_VALUE $testProperty);
+}
+
+interface TEST_ENV_FINDER_ROW_STATIC {
+    /** @return TEST_ENV_ROW_STATIC */ function testFinderMethod(TEST_ENV_VALUE $testProperty);
+}
+
+interface TEST_ENV_FINDER_ROW_PRIVATE {
+    /** @return TEST_ENV_ROW_PRIVATE */ function testFinderMethod(TEST_ENV_VALUE $testProperty);
 }
