@@ -32,26 +32,32 @@ class EnvironmentTest extends \PHPUnit_Framework_TestCase {
         $envStorePropInfo->setAccessible(false);
     }
 
+    public function testImplementNoConstructor() {
+        $impl = $this->env->implement('Fxrm\\Store\\TEST_ENV_EMPTY');
+
+        $this->assertInstanceOf('Fxrm\\Store\\TEST_ENV_EMPTY', $impl);
+    }
+
     public function testImplementMismatchingArgs() {
         $this->setExpectedException('Exception');
-        $this->env->implement('Fxrm\\Store\\TEST_ENV_EMPTY');
+        $this->env->implement('Fxrm\\Store\\TEST_ENV_EMPTY_WITH_ARGS');
     }
 
     public function testImplementWithArgs() {
         $impl = $this->env->implement(
-            'Fxrm\\Store\\TEST_ENV_EMPTY',
+            'Fxrm\\Store\\TEST_ENV_EMPTY_WITH_ARGS',
             'TEST_ARG_A',
             'TEST_ARG_B'
         );
 
-        $this->assertInstanceOf('Fxrm\\Store\\TEST_ENV_EMPTY', $impl);
+        $this->assertInstanceOf('Fxrm\\Store\\TEST_ENV_EMPTY_WITH_ARGS', $impl);
         $this->assertSame('TEST_ARG_A', $impl->a);
         $this->assertSame('TEST_ARG_B', $impl->b);
     }
 
     public function testImplementTwice() {
         $impl = $this->env->implement(
-            'Fxrm\\Store\\TEST_ENV_EMPTY',
+            'Fxrm\\Store\\TEST_ENV_EMPTY_WITH_ARGS',
             'TEST_ARG_A',
             'TEST_ARG_B'
         );
@@ -59,7 +65,7 @@ class EnvironmentTest extends \PHPUnit_Framework_TestCase {
         $implClass = new \ReflectionClass($impl);
 
         $impl2 = $this->env->implement(
-            'Fxrm\\Store\\TEST_ENV_EMPTY',
+            'Fxrm\\Store\\TEST_ENV_EMPTY_WITH_ARGS',
             'TEST_ARG_C',
             'TEST_ARG_D'
         );
@@ -70,6 +76,9 @@ class EnvironmentTest extends \PHPUnit_Framework_TestCase {
 }
 
 abstract class TEST_ENV_EMPTY {
+}
+
+abstract class TEST_ENV_EMPTY_WITH_ARGS {
     public $a, $b;
 
     function __construct($a, $b) {
