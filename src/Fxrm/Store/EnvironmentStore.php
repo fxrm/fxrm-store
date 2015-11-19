@@ -163,22 +163,16 @@ class EnvironmentStore {
 
         $data = $this->backendMap->$backendName->find($implName, $idClass, $valueTypeMap, $values, $fieldClassMap ? $this->getBackendTypeMap($fieldClassMap) : $this->getAnySerializer($returnClass)->getBackendType(), $returnArray);
 
+        $returnElementSerializer = $fieldClassMap !== null
+            ? $this->getDataRowSerializer($returnClass, $fieldClassMap)
+            : $this->getAnySerializer($returnClass);
+
         if ($returnArray) {
-            if ($fieldClassMap) {
-                foreach ($data as &$value) {
-                    $value = $this->internRow($returnClass, $fieldClassMap, $value);
-                }
-            } else {
-                foreach ($data as &$value) {
-                    $value = $this->getAnySerializer($returnClass)->intern($value);
-                }
+            foreach ($data as &$value) {
+                $value = $returnElementSerializer->intern($value);
             }
         } else {
-            if ($fieldClassMap) {
-                $data = $data === null ? null : $this->internRow($returnClass, $fieldClassMap, $data);
-            } else {
-                $data = $this->getAnySerializer($returnClass)->intern($data);
-            }
+            $data = $returnElementSerializer->intern($data);
         }
 
         return $data;
@@ -212,15 +206,15 @@ class EnvironmentStore {
         return property_exists($this->classSerializerCacheMap, $class);
     }
 
-    private function internRow($className, $fieldClassMap, $value) {
-        $result = new $className();
+    private function getDataRowSerializer($className, $fieldClassMap) {
+        $fieldSerializerMap = array();
 
         // copying strictly only the defined properties
         foreach ($fieldClassMap as $k => $class) {
-            $result->$k = $this->getAnySerializer($class)->intern($value->$k);
+            $fieldSerializerMap[$k] = $this->getAnySerializer($class);
         }
 
-        return $result;
+        return new DataRowSerializer($className, $fieldSerializerMap);
     }
 
     private function getAnySerializer($class) {
