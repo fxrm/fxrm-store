@@ -105,7 +105,7 @@ class EnvironmentStore {
     }
 
     function get($backendName, $implName, $idClass, $idObj, $propertyClass, $propertyName) {
-        $id = $this->externAny($idClass, $idObj);
+        $id = $this->externAny($idClass, $idObj); // @todo use identity serializer explicitly
 
         $value = $this->backendMap->$backendName->get($implName, $idClass, $id, $this->getBackendType($propertyClass), $propertyName);
 
@@ -113,7 +113,7 @@ class EnvironmentStore {
     }
 
     function set($backendName, $implName, $idClass, $idObj, $properties) {
-        $id = $this->externAny($idClass, $idObj);
+        $id = $this->externAny($idClass, $idObj); // @todo use identity serializer explicitly
 
         $values = array();
         $valueTypeMap = array();

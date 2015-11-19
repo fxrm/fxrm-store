@@ -36,7 +36,7 @@ class EnvironmentStoreTest extends \PHPUnit_Framework_TestCase {
 
         $ser = $s->createClassSerializer('Fxrm\\Store\\TEST_CLASS_VALUE');
         $this->assertInstanceOf('Fxrm\\Store\\ValueSerializer', $ser);
-        $this->assertEquals((object)array('a' => null, 'b' => null), $ser->extern(new TEST_CLASS_VALUE()));
+        $this->assertEquals((object)array('a' => null, 'b' => 'bee'), $ser->extern(new TEST_CLASS_VALUE()));
     }
 
     public function testExternNonIdentity() {
@@ -138,10 +138,72 @@ class EnvironmentStoreTest extends \PHPUnit_Framework_TestCase {
         $this->assertTrue($s->isSerializableClass('Fxrm\\Store\\TEST_CLASS_ID'));
         $this->assertTrue($s->isSerializableClass('Fxrm\\Store\\TEST_CLASS_VALUE'));
     }
+
+    public function testGet() {
+        $s = new EnvironmentStore(
+            array('TEST_BACKEND' => $this->backend),
+            array('Fxrm\\Store\\TEST_CLASS_ID' => 'TEST_BACKEND'),
+            array(),
+            array()
+        );
+
+        $obj = $s->intern('Fxrm\\Store\\TEST_CLASS_ID', 'TEST_ID_STRING');
+
+        $this->backend->expects($this->once())
+            ->method('get')->with(
+                'TEST_NS\\TEST_CLASS\\TEST_METHOD',
+                'Fxrm\\Store\\TEST_CLASS_ID',
+                'TEST_ID_STRING',
+                null,
+                'TEST_PROPERTY'
+            )
+            ->will($this->returnValue('TEST_PROP_VALUE'));
+
+        $val = $s->get(
+            'TEST_BACKEND',
+            'TEST_NS\\TEST_CLASS\\TEST_METHOD',
+            'Fxrm\\Store\\TEST_CLASS_ID',
+            $obj,
+            null,
+            'TEST_PROPERTY'
+        );
+
+        $this->assertSame('TEST_PROP_VALUE', $val);
+    }
+
+    public function testSet() {
+        $s = new EnvironmentStore(
+            array('TEST_BACKEND' => $this->backend),
+            array('Fxrm\\Store\\TEST_CLASS_ID' => 'TEST_BACKEND'),
+            array('Fxrm\\Store\\TEST_CLASS_VALUE'),
+            array()
+        );
+
+        $obj = $s->intern('Fxrm\\Store\\TEST_CLASS_ID', 'TEST_ID_STRING');
+
+        $this->backend->expects($this->once())
+            ->method('set')->with(
+                'TEST_NS\\TEST_CLASS\\TEST_METHOD',
+                'Fxrm\\Store\\TEST_CLASS_ID',
+                'TEST_ID_STRING',
+                array('TEST_PROPERTY' => array('a' => null, 'b' => null)),
+                array('TEST_PROPERTY' => (object)array('a' => null, 'b' => 'bee'))
+            );
+
+        $s->set(
+            'TEST_BACKEND',
+            'TEST_NS\\TEST_CLASS\\TEST_METHOD',
+            'Fxrm\\Store\\TEST_CLASS_ID',
+            $obj,
+            array(
+                'TEST_PROPERTY' => array('Fxrm\\Store\\TEST_CLASS_VALUE', new TEST_CLASS_VALUE())
+            )
+        );
+    }
 }
 
 class TEST_CLASS_OTHER {}
 class TEST_CLASS_ID {}
 class TEST_CLASS_VALUE {
-    private $a, $b;
+    private $a, $b = 'bee';
 }
