@@ -66,4 +66,12 @@ class TypeInfo {
 
         return new self($prop->getDeclaringClass(), $hint);
     }
+
+    public static function createForMethodReturn(\ReflectionMethod $info) {
+        $hint = preg_match('/@return\\s+(\\S+)/', $info->getDocComment(), $commentMatch) ?
+            $commentMatch[1] :
+            null;
+
+        return new self($info->getDeclaringClass(), $hint);
+    }
 }

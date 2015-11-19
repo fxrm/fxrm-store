@@ -278,7 +278,7 @@ class EnvironmentTest extends \PHPUnit_Framework_TestCase {
                 'Fxrm\\Store\\TEST_ENV_GETTER_OBJECT\\getTEST_ENV_TestProperty',
                 'Fxrm\\Store\\TEST_ENV_Id',
                 $id,
-                '\\stdClass',
+                'stdClass',
                 'testProperty'
             );
 
@@ -461,6 +461,12 @@ class EnvironmentTest extends \PHPUnit_Framework_TestCase {
 
         $this->assertSame('TEST_VALUE', $impl->testFinderMethod($val));
     }
+
+    public function testFinderRowArray() {
+        // @todo a more specific error class
+        $this->setExpectedException('Exception');
+        $this->env->implement('Fxrm\\Store\\TEST_ENV_FINDER_ROW_ARRAY');
+    }
 }
 
 // using random field value to help find mismatch during assertions
@@ -470,6 +476,7 @@ class TEST_ENV_ROW { public $a; }
 class TEST_ENV_ROW_STATIC { public static $s; public $a; }
 class TEST_ENV_ROW_PRIVATE { private $a; }
 class TEST_ENV_ROW_DECORATED { /** @var TEST_ENV_VALUE */ public $a; }
+class TEST_ENV_ROW_ARRAY { /** @var TEST_ENV_VALUE[] */ public $a; }
 
 abstract class TEST_ENV_EMPTY {
 }
@@ -548,4 +555,8 @@ interface TEST_ENV_FINDER_ROW_PRIVATE {
 
 interface TEST_ENV_FINDER_ROW_DECORATED {
     /** @return TEST_ENV_ROW_DECORATED */ function testFinderMethod(TEST_ENV_VALUE $testProperty);
+}
+
+interface TEST_ENV_FINDER_ROW_ARRAY {
+    /** @return TEST_ENV_ROW_ARRAY */ function testFinderMethod(TEST_ENV_VALUE $testProperty);
 }

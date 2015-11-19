@@ -14,8 +14,6 @@ namespace Fxrm\Store;
  * as a factory.
  */
 class Environment {
-    private static $PRIMITIVE_TYPES = array('string', 'integer', 'int'); // @todo add more
-
     /** @var EnvironmentStore */ private $store;
 
     /**
@@ -293,30 +291,6 @@ class Environment {
         return join('', $source);
     }
 
-    private function getRealClass(\ReflectionClass $declaringClass, $classHint) {
-        // convert to full class name
-        if (array_search($classHint, self::$PRIMITIVE_TYPES) !== FALSE) {
-            return null;
-        } elseif ($classHint === 'object') {
-            // special object shorthand
-            return '\\stdClass';
-        } else {
-            return $classHint[0] === '\\' ?
-                substr($classHint, 1) :
-                $declaringClass->getNamespaceName() . '\\' . $classHint;
-        }
-    }
-
-    private function getPropertyClass(\ReflectionProperty $prop) {
-        if (preg_match('/@var\\s+(\\S+)/', $prop->getDocComment(), $commentMatch)) {
-            $targetIdClassHint = $commentMatch[1];
-
-            return $this->getRealClass($prop->getDeclaringClass(), $targetIdClassHint);
-        }
-
-        return null;
-    }
-
     private function getSignature(\ReflectionMethod $info) {
         $signature = (object)array();
 
@@ -324,51 +298,45 @@ class Environment {
 
         $signature->fullName = $info->getDeclaringClass()->getName() . '\\' . $signature->name;
 
-        $comment = $info->getDocComment();
-        if (preg_match('/@return\\s+(\\S+)/', $comment, $commentMatch)) {
-            // flag for semantic auto-magic, even for primitives
-            // @todo handle "void"
-            $signature->hasDeclaredReturnType = true;
+        $signature->hasDeclaredReturnType = !!preg_match('/@return\\s+\\S+/', $info->getDocComment());
 
-            // @todo ignore standard names like "string" and others
-            $targetIdClassHint = $commentMatch[1];
+        $typeInfo = TypeInfo::createForMethodReturn($info);
+        $signature->returnArray = $typeInfo->getIsArray();
 
-            $isArray = substr($targetIdClassHint, -2) === '[]';
+        $targetClassInfo = $typeInfo->getElementClass();
 
-            if ($isArray) {
-                $targetIdClassHint = substr($targetIdClassHint, 0, -2);
-            }
-
-            $targetIdClass = $this->getRealClass($info->getDeclaringClass(), $targetIdClassHint);
-
+        if ($targetClassInfo) {
+            $targetIdClass = $targetClassInfo->getName();
             $fieldMap = null;
 
-            if ($targetIdClass !== null) {
-                $targetClassInfo = new \ReflectionClass($targetIdClass);
+            if ( ! $this->store->isSerializableClass($targetIdClass)) {
+                $fieldMap = array();
 
-                if ( ! $this->store->isSerializableClass($targetIdClass)) {
-                    $fieldMap = array();
-
-                    foreach ($targetClassInfo->getProperties() as $prop) {
-                        if ($prop->isStatic()) {
-                            continue;
-                        }
-
-                        if ( ! $prop->isPublic()) {
-                            throw new \Exception('row object must only contain public properties');
-                        }
-
-                        $fieldMap[$prop->getName()] = $this->getPropertyClass($prop);
+                // @todo move into DataRowSerializer constructor
+                foreach ($targetClassInfo->getProperties() as $prop) {
+                    if ($prop->isStatic()) {
+                        continue;
                     }
+
+                    if ( ! $prop->isPublic()) {
+                        throw new \Exception('row object must only contain public properties');
+                    }
+
+                    $propTypeInfo = TypeInfo::createForProperty($prop);
+
+                    // @todo support array properties!
+                    if ($propTypeInfo->getIsArray()) {
+                        throw new \Exception('array properties are not supported here yet');
+                    }
+
+                    $propClass = $propTypeInfo->getElementClass();
+                    $fieldMap[$prop->getName()] = $propClass !== null ? $propClass->getName() : null;
                 }
             }
 
-            $signature->returnArray = $isArray;
             $signature->returnType = $targetIdClass;
             $signature->returnFieldMap = $fieldMap;
         } else {
-            $signature->hasDeclaredReturnType = false;
-            $signature->returnArray = false;
             $signature->returnType = null;
             $signature->returnFieldMap = null;
         }
