@@ -18,7 +18,7 @@ class MySQLFunctionalTest extends \PHPUnit_Framework_TestCase {
             insert into MyTest (testProp, testDate) VALUES (\'v1\', 1), (\'v2\', 2);
         ');
 
-        $this->backend = new \Fxrm\Store\MySQLBackend($dsn, $user, $password);
+        $this->backend = new \Fxrm\Store\MySQLBackend($dsn . ';dbname=myapp_test', $user, $password);
     }
 
     public function tearDown() {
