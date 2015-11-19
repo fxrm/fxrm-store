@@ -145,6 +145,27 @@ class EnvironmentTest extends \PHPUnit_Framework_TestCase {
         $this->assertSame('TEST_OBJ', $this->env->importUsing($impl, 'TEST_CLASS', 'TEST_STRING'));
     }
 
+    public function testRetrieveUsing() {
+        $this->store->expects($this->any())
+            ->method('retrieve')->with(
+                'TEST_BACKEND',
+                'TEST_SPEC_MAP',
+                'TEST_PARAM_MAP',
+                'TEST_COLUMN_MAP'
+            )
+            ->will($this->returnValue('TEST_DATA'));
+
+        $impl = $this->env->implement('Fxrm\\Store\\TEST_ENV_EMPTY');
+
+        $this->assertSame('TEST_DATA', $this->env->retrieveUsing(
+            $impl,
+            'TEST_BACKEND',
+            'TEST_SPEC_MAP',
+            'TEST_PARAM_MAP',
+            'TEST_COLUMN_MAP'
+        ));
+    }
+
     public function testGetter() {
         $this->store->expects($this->any())
             ->method('getBackendName')->with(
