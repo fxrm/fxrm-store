@@ -168,10 +168,39 @@ class EnvironmentTest extends \PHPUnit_Framework_TestCase {
 
         $this->assertSame('TEST_VALUE', $val);
     }
+
+    public function testSetter() {
+        $this->store->expects($this->any())
+            ->method('getBackendName')->with(
+                'Fxrm\\Store\\TEST_ENV_SETTER\\testSetterMethod',
+                'Fxrm\\Store\\TEST_ENV_Id',
+                'testId'
+            )
+            ->will($this->returnValue('TEST_BACKEND'));
+
+        $id = new TEST_ENV_Id();
+        $val = new TEST_ENV_VALUE();
+        $impl = $this->env->implement('Fxrm\\Store\\TEST_ENV_SETTER');
+
+        $this->store->expects($this->once())
+            ->method('set')->with(
+                'TEST_BACKEND',
+                'Fxrm\\Store\\TEST_ENV_SETTER\\testSetterMethod',
+                'Fxrm\\Store\\TEST_ENV_Id',
+                $id,
+                array(
+                    'testProperty' => array('Fxrm\\Store\\TEST_ENV_VALUE', $val)
+                )
+            )
+            ->will($this->returnValue('TEST_VALUE'));
+
+        $impl->testSetterMethod($id, $val);
+    }
 }
 
-class TEST_ENV_Id {}
-class TEST_ENV_VALUE {}
+// using random field value to help find mismatch during assertions
+class TEST_ENV_Id { function __construct() { $this->v = rand(); } }
+class TEST_ENV_VALUE { function __construct() { $this->v = rand(); } }
 
 abstract class TEST_ENV_EMPTY {
 }
@@ -194,4 +223,8 @@ interface TEST_ENV_GETTER {
 }
 
 abstract class TEST_ENV_DERIVED_OF_GETTER implements TEST_ENV_GETTER {
+}
+
+interface TEST_ENV_SETTER {
+    function testSetterMethod(TEST_ENV_Id $testId, TEST_ENV_VALUE $testProperty);
 }
