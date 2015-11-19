@@ -94,6 +94,10 @@ class EnvironmentTest extends \PHPUnit_Framework_TestCase {
     }
 
     public function testImplementParentMethods() {
+        $this->store->expects($this->any())
+            ->method('isSerializableClass')
+            ->will($this->returnValue(true));
+
         $impl = $this->env->implement('Fxrm\\Store\\TEST_ENV_DERIVED_OF_GETTER');
         $implClass = new \ReflectionClass($impl);
         $implMethodInfo = $implClass->getMethod('getTEST_ENV_TestProperty');
@@ -150,6 +154,10 @@ class EnvironmentTest extends \PHPUnit_Framework_TestCase {
             )
             ->will($this->returnValue('TEST_BACKEND'));
 
+        $this->store->expects($this->any())
+            ->method('isSerializableClass')
+            ->will($this->returnValue(true));
+
         $id = new TEST_ENV_Id();
         $impl = $this->env->implement('Fxrm\\Store\\TEST_ENV_GETTER');
 
@@ -177,6 +185,10 @@ class EnvironmentTest extends \PHPUnit_Framework_TestCase {
                 'testId'
             )
             ->will($this->returnValue('TEST_BACKEND'));
+
+        $this->store->expects($this->any())
+            ->method('isSerializableClass')
+            ->will($this->returnValue(true));
 
         $id = new TEST_ENV_Id();
         $val = new TEST_ENV_VALUE();
