@@ -43,6 +43,7 @@ class EnvironmentStore {
             $this->serializerMap->$valueClass = new ValueSerializer($valueClass, $this);
         }
 
+        // @todo this should not be part of this
         $this->serializerMap->DateTime = new PassthroughSerializer(Backend::DATE_TIME_TYPE);
 
         // copy over the method backend names
@@ -54,6 +55,7 @@ class EnvironmentStore {
         }
     }
 
+    // @todo eliminate this in favour of getIdentitySerializer or something
     function createClassSerializer($className) {
         if ($className === 'DateTime') {
             return new PassthroughSerializer(Backend::DATE_TIME_TYPE);
