@@ -134,23 +134,6 @@ class EnvironmentStoreTest extends \PHPUnit_Framework_TestCase {
         $this->assertSame('TEST_BACKEND', $s->getBackendName('TEST_NS\\TEST_CLASS\\TEST_METHOD', 'Fxrm\\Store\\TEST_CLASS_ID', null));
     }
 
-    public function testDateTimeIsSerializable() {
-        $s = new EnvironmentStore(array(), array(), array(), array());
-        $this->assertTrue($s->isSerializableClass('DateTime'));
-    }
-
-    public function testCustomClassesAreSerializable() {
-        $s = new EnvironmentStore(
-            array('TEST_BACKEND' => $this->backend),
-            array('Fxrm\\Store\\TEST_CLASS_ID' => 'TEST_BACKEND'),
-            array('Fxrm\\Store\\TEST_CLASS_VALUE'),
-            array()
-        );
-        $this->assertFalse($s->isSerializableClass('Fxrm\\Store\\TEST_CLASS_OTHER'));
-        $this->assertTrue($s->isSerializableClass('Fxrm\\Store\\TEST_CLASS_ID'));
-        $this->assertTrue($s->isSerializableClass('Fxrm\\Store\\TEST_CLASS_VALUE'));
-    }
-
     public function testGet() {
         $s = new EnvironmentStore(
             array('TEST_BACKEND' => $this->backend),

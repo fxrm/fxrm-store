@@ -198,11 +198,6 @@ class EnvironmentStore {
         return $returnSerializer->intern($data);
     }
 
-    // @todo remove?
-    function isSerializableClass($class) {
-        return property_exists($this->classSerializerCacheMap, $class);
-    }
-
     private function getRowFieldSerializerMap($className) {
         $targetClassInfo = new \ReflectionClass($className);
         $fieldMap = array();
