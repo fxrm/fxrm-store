@@ -12,6 +12,7 @@ namespace Fxrm\Store;
  */
 class EnvironmentStore {
     private $backendMap;
+    private $primitiveSerializer;
     private $classSerializerCacheMap;
     private $idSerializerMap;
     private $idClassMap;
@@ -28,6 +29,9 @@ class EnvironmentStore {
 
             $this->backendMap->$backendName = $backendInstance;
         }
+
+        // used to pass-through primitives
+        $this->primitiveSerializer = new PassthroughSerializer();
 
         // set up identity serializers
         $this->classSerializerCacheMap = (object)array();
@@ -118,15 +122,15 @@ class EnvironmentStore {
     }
 
     function get($backendName, $implName, $idClass, $idObj, $propertyClass, $propertyName) {
-        $id = $this->externAny($idClass, $idObj); // @todo use identity serializer explicitly
+        $id = $this->getAnySerializer($idClass)->extern($idObj); // @todo use identity serializer explicitly
 
-        $value = $this->backendMap->$backendName->get($implName, $idClass, $id, $this->getBackendType($propertyClass), $propertyName);
+        $value = $this->backendMap->$backendName->get($implName, $idClass, $id, $this->getAnySerializer($propertyClass)->getBackendType(), $propertyName);
 
-        return $this->internAny($propertyClass, $value);
+        return $this->getAnySerializer($propertyClass)->intern($value);
     }
 
     function set($backendName, $implName, $idClass, $idObj, $properties) {
-        $id = $this->externAny($idClass, $idObj); // @todo use identity serializer explicitly
+        $id = $this->getAnySerializer($idClass)->extern($idObj); // @todo use identity serializer explicitly
 
         $values = array();
         $valueTypeMap = array();
@@ -134,8 +138,8 @@ class EnvironmentStore {
         foreach ($properties as $propertyName => $qualifiedValue) {
             list($propertyClass, $value) = $qualifiedValue;
 
-            $values[$propertyName] = $this->externAny($propertyClass, $value);
-            $valueTypeMap[$propertyName] = $this->getBackendType($propertyClass);
+            $values[$propertyName] = $this->getAnySerializer($propertyClass)->extern($value);
+            $valueTypeMap[$propertyName] = $this->getAnySerializer($propertyClass)->getBackendType();
         }
 
         $this->backendMap->$backendName->set($implName, $idClass, $id, $valueTypeMap, $values);
@@ -148,13 +152,13 @@ class EnvironmentStore {
         foreach ($properties as $propertyName => $qualifiedValue) {
             list($propertyClass, $value) = $qualifiedValue;
 
-            $values[$propertyName] = $this->externAny($propertyClass, $value);
-            $valueTypeMap[$propertyName] = $this->getBackendType($propertyClass);
+            $values[$propertyName] = $this->getAnySerializer($propertyClass)->extern($value);
+            $valueTypeMap[$propertyName] = $this->getAnySerializer($propertyClass)->getBackendType();
         }
 
         $idClass = property_exists($this->idSerializerMap, $returnClass) ? $returnClass : null;
 
-        $data = $this->backendMap->$backendName->find($implName, $idClass, $valueTypeMap, $values, $fieldClassMap ? $this->getBackendTypeMap($fieldClassMap) : $this->getBackendType($returnClass), $returnArray);
+        $data = $this->backendMap->$backendName->find($implName, $idClass, $valueTypeMap, $values, $fieldClassMap ? $this->getBackendTypeMap($fieldClassMap) : $this->getAnySerializer($returnClass)->getBackendType(), $returnArray);
 
         if ($returnArray) {
             if ($fieldClassMap) {
@@ -163,14 +167,14 @@ class EnvironmentStore {
                 }
             } else {
                 foreach ($data as &$value) {
-                    $value = $this->internAny($returnClass, $value);
+                    $value = $this->getAnySerializer($returnClass)->intern($value);
                 }
             }
         } else {
             if ($fieldClassMap) {
                 $data = $data === null ? null : $this->internRow($returnClass, $fieldClassMap, $data);
             } else {
-                $data = $this->internAny($returnClass, $data);
+                $data = $this->getAnySerializer($returnClass)->intern($data);
             }
         }
 
@@ -184,15 +188,15 @@ class EnvironmentStore {
         foreach ($paramMap as $paramName => $paramValue) {
             // @todo find a way to declare param class?
             $paramClass = is_object($paramValue) ? get_class($paramValue) : null;
-            $paramValueMap[$paramName] = $this->externAny($paramClass, $paramValue);
-            $paramTypeMap[$paramName] = $this->getBackendType($paramClass);
+            $paramValueMap[$paramName] = $this->getAnySerializer($paramClass)->extern($paramValue);
+            $paramTypeMap[$paramName] = $this->getAnySerializer($paramClass)->getBackendType();
         }
 
         $data = $this->backendMap->$backendName->retrieve($querySpecMap, $paramTypeMap, $paramValueMap, $this->getBackendTypeMap($returnTypeMap));
 
         foreach ($data as &$value) {
             foreach ($returnTypeMap as $k => $class) {
-                $value->$k = $this->internAny($class, $value->$k);
+                $value->$k = $this->getAnySerializer($class)->intern($value->$k);
             }
         }
 
@@ -208,26 +212,24 @@ class EnvironmentStore {
 
         // copying strictly only the defined properties
         foreach ($fieldClassMap as $k => $class) {
-            $result->$k = $this->internAny($class, $value->$k);
+            $result->$k = $this->getAnySerializer($class)->intern($value->$k);
         }
 
         return $result;
     }
 
-    private function internAny($class, $value) {
-        return $class === null ? $value : $this->createClassSerializer($class)->intern($value);
-    }
-
-    private function externAny($class, $value) {
-        return $class === null ? $value : $this->createClassSerializer($class)->extern($value);
-    }
-
-    private function getBackendType($class) {
-        return $class === null ? null : $this->createClassSerializer($class)->getBackendType();
+    private function getAnySerializer($class) {
+        return $class === null ? $this->primitiveSerializer : $this->createClassSerializer($class);
     }
 
     private function getBackendTypeMap($classMap) {
-        return array_map(array($this, 'getBackendType'), $classMap);
+        return array_map(
+            function (Serializer $v) { return $v->getBackendType(); },
+            array_map(
+                array($this, 'getAnySerializer'),
+                $classMap
+            )
+        );
     }
 }
 
