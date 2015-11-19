@@ -195,8 +195,9 @@ class Environment {
             throw new \Exception('getters must have one parameter');
         }
 
-        if ($signature->returnArray || $signature->returnFieldMap) {
-            throw new \Exception('getters cannot return arrays or row objects');
+        // @todo check if serializable
+        if ($signature->returnTypeInfo->getIsArray()) {
+            throw new \Exception('getters cannot return arrays');
         }
 
         if ( ! preg_match('/([^\\\\]+)Id$/', $signature->firstParameterClass, $idMatch)) {
@@ -218,7 +219,7 @@ class Environment {
         $source[] = var_export($signature->fullName, true) . ', ';
         $source[] = var_export($signature->firstParameterClass, true) . ', ';
         $source[] = '$a0, ';
-        $source[] = var_export($signature->returnType, true) . ', ';
+        $source[] = var_export($signature->returnTypeInfo->getElementClassName(), true) . ', ';
         $source[] = var_export($propertyName, true);
         $source[] = ');';
         $source[] = '}';
@@ -262,14 +263,14 @@ class Environment {
     }
 
     private function defineFinder($signature) {
-        $backendName = $this->store->getBackendName($signature->fullName, $signature->returnType, null);
+        $backendName = $this->store->getBackendName($signature->fullName, $signature->returnTypeInfo->getElementClassName(), null);
 
         $source[] = $signature->preamble . ' {';
         $source[] = 'return $this->s->find(';
         $source[] = var_export($backendName, true) . ', ';
         $source[] = var_export($signature->fullName, true) . ', ';
-        $source[] = var_export($signature->returnType, true) . ', ';
-        $source[] = var_export($signature->returnFieldMap, true) . ', ';
+        $source[] = var_export($signature->returnTypeInfo->getElementClassName(), true) . ', ';
+        $source[] = var_export($this->getRowFieldMap($signature->returnTypeInfo), true) . ', ';
         $source[] = 'array(';
 
         $count = 0;
@@ -284,11 +285,48 @@ class Environment {
         }
 
         $source[] = '),';
-        $source[] = $signature->returnArray ? 'true' : 'false';
+        $source[] = $signature->returnTypeInfo->getIsArray() ? 'true' : 'false';
         $source[] = ');';
         $source[] = '}';
 
         return join('', $source);
+    }
+
+    private function getRowFieldMap(TypeInfo $typeInfo) {
+        $targetClassInfo = $typeInfo->getElementClass();
+
+        if ($targetClassInfo === null) {
+            return null;
+        }
+
+        if ($this->store->isSerializableClass($targetClassInfo->getName())) {
+            throw new \Exception('cannot use serializable class as row object');
+        }
+
+        $fieldMap = array();
+
+        // @todo move into DataRowSerializer constructor
+        foreach ($targetClassInfo->getProperties() as $prop) {
+            if ($prop->isStatic()) {
+                continue;
+            }
+
+            if ( ! $prop->isPublic()) {
+                throw new \Exception('row object must only contain public properties');
+            }
+
+            $propTypeInfo = TypeInfo::createForProperty($prop);
+
+            // @todo support array properties!
+            if ($propTypeInfo->getIsArray()) {
+                throw new \Exception('array properties are not supported here yet');
+            }
+
+            $propClass = $propTypeInfo->getElementClass();
+            $fieldMap[$prop->getName()] = $propClass !== null ? $propClass->getName() : null;
+        }
+
+        return $fieldMap;
     }
 
     private function getSignature(\ReflectionMethod $info) {
@@ -301,45 +339,7 @@ class Environment {
         $signature->hasDeclaredReturnType = !!preg_match('/@return\\s+\\S+/', $info->getDocComment());
 
         $typeInfo = TypeInfo::createForMethodReturn($info);
-        $signature->returnArray = $typeInfo->getIsArray();
-
-        $targetClassInfo = $typeInfo->getElementClass();
-
-        if ($targetClassInfo) {
-            $targetIdClass = $targetClassInfo->getName();
-            $fieldMap = null;
-
-            if ( ! $this->store->isSerializableClass($targetIdClass)) {
-                $fieldMap = array();
-
-                // @todo move into DataRowSerializer constructor
-                foreach ($targetClassInfo->getProperties() as $prop) {
-                    if ($prop->isStatic()) {
-                        continue;
-                    }
-
-                    if ( ! $prop->isPublic()) {
-                        throw new \Exception('row object must only contain public properties');
-                    }
-
-                    $propTypeInfo = TypeInfo::createForProperty($prop);
-
-                    // @todo support array properties!
-                    if ($propTypeInfo->getIsArray()) {
-                        throw new \Exception('array properties are not supported here yet');
-                    }
-
-                    $propClass = $propTypeInfo->getElementClass();
-                    $fieldMap[$prop->getName()] = $propClass !== null ? $propClass->getName() : null;
-                }
-            }
-
-            $signature->returnType = $targetIdClass;
-            $signature->returnFieldMap = $fieldMap;
-        } else {
-            $signature->returnType = null;
-            $signature->returnFieldMap = null;
-        }
+        $signature->returnTypeInfo = $typeInfo;
 
         $signature->parameters = (object)array();
         foreach ($info->getParameters() as $param) {

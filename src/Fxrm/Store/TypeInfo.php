@@ -55,8 +55,13 @@ class TypeInfo {
         return $this->isArray;
     }
 
+    // @todo have an element class getter and a standalone class getter (mutually exclusive)
     public function getElementClass() {
         return $this->classInfo;
+    }
+
+    public function getElementClassName() {
+        return $this->classInfo !== null ? $this->classInfo->getName() : null;
     }
 
     public static function createForProperty(\ReflectionProperty $prop) {
