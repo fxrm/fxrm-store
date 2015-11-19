@@ -12,7 +12,7 @@ namespace Fxrm\Store;
  */
 class EnvironmentStore {
     private $backendMap;
-    private $serializerMap;
+    private $classSerializerCacheMap;
     private $idSerializerMap;
     private $idClassMap;
     private $methodMap;
@@ -29,26 +29,26 @@ class EnvironmentStore {
             $this->backendMap->$backendName = $backendInstance;
         }
 
-        // set up serializers
-        // @todo verify names
-        $this->serializerMap = (object)array();
+        // set up identity serializers
+        $this->classSerializerCacheMap = (object)array();
         $this->idSerializerMap = (object)array();
         $this->idClassMap = (object)array();
 
         foreach ($idClasses as $idClass => $backendName) {
             $this->idClassMap->$idClass = $backendName;
             $ser = new IdentitySerializer($idClass, $this->backendMap->$backendName);
-            $this->serializerMap->$idClass = $ser;
             $this->idSerializerMap->$idClass = $ser;
+
+            $this->classSerializerCacheMap->$idClass = null;
         }
 
+        // mark value classes as serializable
         foreach ($valueClasses as $valueClass) {
-            // @todo what about recursion?
-            $this->serializerMap->$valueClass = new ValueSerializer($valueClass, $this);
+            $this->classSerializerCacheMap->$valueClass = null;
         }
 
-        // @todo this should not be part of this
-        $this->serializerMap->DateTime = new PassthroughSerializer(Backend::DATE_TIME_TYPE);
+        // DateTime is always serializable
+        $this->classSerializerCacheMap->DateTime = null;
 
         // copy over the method backend names
         // @todo verify names
@@ -61,13 +61,23 @@ class EnvironmentStore {
 
     // @todo eliminate this in favour of getIdentitySerializer or something
     function createClassSerializer($className) {
-        if ($className === 'DateTime') {
-            return new PassthroughSerializer(Backend::DATE_TIME_TYPE);
+        if (!property_exists($this->classSerializerCacheMap, $className)) {
+            throw new \Exception('not a serializable class');
         }
 
-        return property_exists($this->idSerializerMap, $className) ?
-            $this->idSerializerMap->$className : // have to return same instance as everywhere else
-            new ValueSerializer($className, $this);
+        // cache the created serializers
+        if ($this->classSerializerCacheMap->$className === null) {
+            $this->classSerializerCacheMap->$className = (
+                property_exists($this->idSerializerMap, $className)
+                    ? $this->idSerializerMap->$className // have to return same instance as everywhere else
+                    : ($className === 'DateTime'
+                        ? new PassthroughSerializer(Backend::DATE_TIME_TYPE)
+                        : new ValueSerializer($className, $this)
+                    )
+            );
+        }
+
+        return $this->classSerializerCacheMap->$className;
     }
 
     function extern($obj) {
@@ -190,7 +200,7 @@ class EnvironmentStore {
     }
 
     function isSerializableClass($class) {
-        return property_exists($this->serializerMap, $class);
+        return property_exists($this->classSerializerCacheMap, $class);
     }
 
     private function internRow($className, $fieldClassMap, $value) {
@@ -205,15 +215,15 @@ class EnvironmentStore {
     }
 
     private function internAny($class, $value) {
-        return $class === null ? $value : $this->serializerMap->$class->intern($value);
+        return $class === null ? $value : $this->createClassSerializer($class)->intern($value);
     }
 
     private function externAny($class, $value) {
-        return $class === null ? $value : $this->serializerMap->$class->extern($value);
+        return $class === null ? $value : $this->createClassSerializer($class)->extern($value);
     }
 
     private function getBackendType($class) {
-        return $class === null ? null : $this->serializerMap->$class->getBackendType();
+        return $class === null ? null : $this->createClassSerializer($class)->getBackendType();
     }
 
     private function getBackendTypeMap($classMap) {

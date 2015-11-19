@@ -44,6 +44,13 @@ class EnvironmentStoreTest extends \PHPUnit_Framework_TestCase {
         $this->assertEquals((object)array('a' => null, 'b' => 'bee'), $ser->extern(new TEST_CLASS_VALUE()));
     }
 
+    public function testSerializerUnknown() {
+        $s = new EnvironmentStore(array(), array(), array(), array());
+
+        $this->setExpectedException('Exception');
+        $s->createClassSerializer('Fxrm\\Store\\TEST_CLASS_VALUE');
+    }
+
     public function testExternNonIdentity() {
         $s = new EnvironmentStore(array(), array(), array('Fxrm\\Store\\TEST_CLASS_VALUE'), array());
 
