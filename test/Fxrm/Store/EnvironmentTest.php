@@ -406,6 +406,40 @@ class EnvironmentTest extends \PHPUnit_Framework_TestCase {
         $this->setExpectedException('Exception');
         $this->env->implement('Fxrm\\Store\\TEST_ENV_FINDER_ROW_PRIVATE');
     }
+
+    public function testFinderRowDecorated() {
+        $this->store->expects($this->any())
+            ->method('getBackendName')->with(
+                'Fxrm\\Store\\TEST_ENV_FINDER_ROW_DECORATED\\testFinderMethod',
+                'Fxrm\\Store\\TEST_ENV_ROW_DECORATED',
+                null
+            )
+            ->will($this->returnValue('TEST_BACKEND'));
+
+        $this->store->expects($this->any())
+            ->method('isSerializableClass')
+            ->will($this->returnValue(false));
+
+        $val = new TEST_ENV_VALUE();
+        $impl = $this->env->implement('Fxrm\\Store\\TEST_ENV_FINDER_ROW_DECORATED');
+
+        $this->store->expects($this->once())
+            ->method('find')->with(
+                'TEST_BACKEND',
+                'Fxrm\\Store\\TEST_ENV_FINDER_ROW_DECORATED\\testFinderMethod',
+                'Fxrm\\Store\\TEST_ENV_ROW_DECORATED',
+                array(
+                    'a' => 'Fxrm\\Store\\TEST_ENV_VALUE'
+                ),
+                array(
+                    'testProperty' => array('Fxrm\\Store\\TEST_ENV_VALUE', $val)
+                ),
+                false
+            )
+            ->will($this->returnValue('TEST_VALUE'));
+
+        $this->assertSame('TEST_VALUE', $impl->testFinderMethod($val));
+    }
 }
 
 // using random field value to help find mismatch during assertions
@@ -414,6 +448,7 @@ class TEST_ENV_VALUE { function __construct() { $this->v = rand(); } }
 class TEST_ENV_ROW { public $a; }
 class TEST_ENV_ROW_STATIC { public static $s; public $a; }
 class TEST_ENV_ROW_PRIVATE { private $a; }
+class TEST_ENV_ROW_DECORATED { /** @var TEST_ENV_VALUE */ public $a; }
 
 abstract class TEST_ENV_EMPTY {
 }
@@ -488,4 +523,8 @@ interface TEST_ENV_FINDER_ROW_STATIC {
 
 interface TEST_ENV_FINDER_ROW_PRIVATE {
     /** @return TEST_ENV_ROW_PRIVATE */ function testFinderMethod(TEST_ENV_VALUE $testProperty);
+}
+
+interface TEST_ENV_FINDER_ROW_DECORATED {
+    /** @return TEST_ENV_ROW_DECORATED */ function testFinderMethod(TEST_ENV_VALUE $testProperty);
 }
