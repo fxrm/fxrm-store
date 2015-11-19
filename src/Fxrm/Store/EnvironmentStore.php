@@ -167,15 +167,11 @@ class EnvironmentStore {
             ? $this->getDataRowSerializer($returnClass, $fieldClassMap)
             : $this->getAnySerializer($returnClass);
 
-        if ($returnArray) {
-            foreach ($data as &$value) {
-                $value = $returnElementSerializer->intern($value);
-            }
-        } else {
-            $data = $returnElementSerializer->intern($data);
-        }
+        $returnSerializer = $returnArray
+            ? new ArraySerializer($returnElementSerializer)
+            : $returnElementSerializer;
 
-        return $data;
+        return $returnSerializer->intern($data);
     }
 
     function retrieve($backendName, $querySpecMap, $paramMap, $returnTypeMap) {
