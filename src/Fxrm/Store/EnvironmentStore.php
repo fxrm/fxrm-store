@@ -32,6 +32,7 @@ class EnvironmentStore {
 
         // used to pass-through primitives
         $this->primitiveSerializer = new PassthroughSerializer();
+        $this->dateTimeSerializer = new PassthroughSerializer(Backend::DATE_TIME_TYPE);
 
         // set up identity serializers
         $this->classSerializerCacheMap = (object)array();
@@ -42,17 +43,12 @@ class EnvironmentStore {
             $this->idClassMap->$idClass = $backendName;
             $ser = new IdentitySerializer($idClass, $this->backendMap->$backendName);
             $this->idSerializerMap->$idClass = $ser;
-
-            $this->classSerializerCacheMap->$idClass = null;
         }
 
         // mark value classes as serializable
         foreach ($valueClasses as $valueClass) {
             $this->classSerializerCacheMap->$valueClass = null;
         }
-
-        // DateTime is always serializable
-        $this->classSerializerCacheMap->DateTime = null;
 
         // copy over the method backend names
         // @todo verify names
@@ -61,31 +57,6 @@ class EnvironmentStore {
         foreach ($methods as $method => $backendName) {
             $this->methodMap->$method = $backendName;
         }
-    }
-
-    // @todo eliminate this in favour of getIdentitySerializer or something
-    private function createClassSerializer($className, $allowDataRows = false) {
-        if (!property_exists($this->classSerializerCacheMap, $className)) {
-            if ($allowDataRows) {
-                return new DataRowSerializer($className, $this->getRowFieldSerializerMap($className));
-            }
-
-            throw new \Exception('not a serializable class');
-        }
-
-        // cache the created serializers
-        if ($this->classSerializerCacheMap->$className === null) {
-            $this->classSerializerCacheMap->$className = (
-                property_exists($this->idSerializerMap, $className)
-                    ? $this->idSerializerMap->$className // have to return same instance as everywhere else
-                    : ($className === 'DateTime'
-                        ? new PassthroughSerializer(Backend::DATE_TIME_TYPE)
-                        : new ValueSerializer($className, $this)
-                    )
-            );
-        }
-
-        return $this->classSerializerCacheMap->$className;
     }
 
     public function createSerializer(TypeInfo $typeInfo) {
@@ -239,9 +210,35 @@ class EnvironmentStore {
 
     /** @return Serializer */
     private function getAnySerializer($class, $allowDataRows = false) {
-        return $class === null
-            ? $this->primitiveSerializer
-            : $this->createClassSerializer($class, $allowDataRows);
+        if ($class === null) {
+            return $this->primitiveSerializer;
+        }
+
+        if ($class === 'DateTime') {
+            return $this->dateTimeSerializer;
+        }
+
+        // consistently return shared id serializer instances
+        if (property_exists($this->idSerializerMap, $class)) {
+            return $this->idSerializerMap->$class;
+        }
+
+        // see if marked serializable at all
+        if (!property_exists($this->classSerializerCacheMap, $class)) {
+            if ($allowDataRows) {
+                return new DataRowSerializer($class, $this->getRowFieldSerializerMap($class));
+            }
+
+            throw new \Exception('not a serializable class');
+        }
+
+        // cache the created serializers
+        // @todo simple recursion check
+        if ($this->classSerializerCacheMap->$class === null) {
+            $this->classSerializerCacheMap->$class = new ValueSerializer($class, $this);
+        }
+
+        return $this->classSerializerCacheMap->$class;
     }
 }
 
