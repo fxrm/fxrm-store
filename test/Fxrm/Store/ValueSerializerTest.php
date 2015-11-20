@@ -7,7 +7,7 @@ class ValueSerializerTest extends \PHPUnit_Framework_TestCase {
         $this->store = $this->getMock('Fxrm\\Store\\EnvironmentStore', array(), array(), '', false);
 
         $store = $this->store;
-        $this->store->expects($this->any())->method('createSerializer')->will($this->returnCallback(function (TypeInfo $typeInfo) use($store) {
+        $this->store->expects($this->any())->method('getSerializerForType')->will($this->returnCallback(function (TypeInfo $typeInfo) use($store) {
             $eltSer = $typeInfo->getElementClass() === null
                 ? new PassthroughSerializer()
                 : new ValueSerializer($typeInfo->getElementClass()->getName(), $store);
