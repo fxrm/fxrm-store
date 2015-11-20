@@ -32,6 +32,7 @@ class EnvironmentStore {
 
         // used to pass-through primitives
         $this->primitiveSerializer = new PassthroughSerializer();
+        $this->dateTimeSerializer = new PassthroughSerializer(Backend::DATE_TIME_TYPE);
 
         // set up identity serializers
         $this->classSerializerCacheMap = (object)array();
@@ -42,17 +43,12 @@ class EnvironmentStore {
             $this->idClassMap->$idClass = $backendName;
             $ser = new IdentitySerializer($idClass, $this->backendMap->$backendName);
             $this->idSerializerMap->$idClass = $ser;
-
-            $this->classSerializerCacheMap->$idClass = null;
         }
 
         // mark value classes as serializable
         foreach ($valueClasses as $valueClass) {
             $this->classSerializerCacheMap->$valueClass = null;
         }
-
-        // DateTime is always serializable
-        $this->classSerializerCacheMap->DateTime = null;
 
         // copy over the method backend names
         // @todo verify names
@@ -63,25 +59,12 @@ class EnvironmentStore {
         }
     }
 
-    // @todo eliminate this in favour of getIdentitySerializer or something
-    function createClassSerializer($className) {
-        if (!property_exists($this->classSerializerCacheMap, $className)) {
-            throw new \Exception('not a serializable class');
-        }
+    public function getSerializerForType(TypeInfo $typeInfo) {
+        $elementSerializer = $this->getSerializerForClassOrPrimitive($typeInfo->getElementClassName());
 
-        // cache the created serializers
-        if ($this->classSerializerCacheMap->$className === null) {
-            $this->classSerializerCacheMap->$className = (
-                property_exists($this->idSerializerMap, $className)
-                    ? $this->idSerializerMap->$className // have to return same instance as everywhere else
-                    : ($className === 'DateTime'
-                        ? new PassthroughSerializer(Backend::DATE_TIME_TYPE)
-                        : new ValueSerializer($className, $this)
-                    )
-            );
-        }
-
-        return $this->classSerializerCacheMap->$className;
+        return $typeInfo->getIsArray() ?
+            new ArraySerializer($elementSerializer) :
+            $elementSerializer;
     }
 
     function extern($obj) {
@@ -122,8 +105,8 @@ class EnvironmentStore {
     }
 
     function get($backendName, $implName, $idClass, $idObj, $propertyClass, $propertyName) {
-        $id = $this->getAnySerializer($idClass)->extern($idObj); // @todo use identity serializer explicitly
-        $propertySerializer = $this->getAnySerializer($propertyClass);
+        $id = $this->getSerializerForClassOrPrimitive($idClass)->extern($idObj); // @todo use identity serializer explicitly
+        $propertySerializer = $this->getSerializerForClassOrPrimitive($propertyClass);
 
         $value = $this->backendMap->$backendName->get($implName, $idClass, $id, $propertySerializer->getBackendType(), $propertyName);
 
@@ -131,14 +114,14 @@ class EnvironmentStore {
     }
 
     function set($backendName, $implName, $idClass, $idObj, $properties) {
-        $id = $this->getAnySerializer($idClass)->extern($idObj); // @todo use identity serializer explicitly
+        $id = $this->getSerializerForClassOrPrimitive($idClass)->extern($idObj); // @todo use identity serializer explicitly
 
         $values = array();
         $valueTypeMap = array();
 
         foreach ($properties as $propertyName => $qualifiedValue) {
             list($propertyClass, $value) = $qualifiedValue;
-            $propertySerializer = $this->getAnySerializer($propertyClass);
+            $propertySerializer = $this->getSerializerForClassOrPrimitive($propertyClass);
 
             $values[$propertyName] = $propertySerializer->extern($value);
             $valueTypeMap[$propertyName] = $propertySerializer->getBackendType();
@@ -147,13 +130,13 @@ class EnvironmentStore {
         $this->backendMap->$backendName->set($implName, $idClass, $id, $valueTypeMap, $values);
     }
 
-    function find($backendName, $implName, $returnClass, $fieldClassMap, $properties, $returnArray) {
+    function find($backendName, $implName, $returnClass, $properties, $returnArray) {
         $values = array();
         $valueTypeMap = array();
 
         foreach ($properties as $propertyName => $qualifiedValue) {
             list($propertyClass, $value) = $qualifiedValue;
-            $propertySerializer = $this->getAnySerializer($propertyClass);
+            $propertySerializer = $this->getSerializerForClassOrPrimitive($propertyClass);
 
             $values[$propertyName] = $propertySerializer->extern($value);
             $valueTypeMap[$propertyName] = $propertySerializer->getBackendType();
@@ -161,9 +144,8 @@ class EnvironmentStore {
 
         $idClass = property_exists($this->idSerializerMap, $returnClass) ? $returnClass : null;
 
-        $returnElementSerializer = $fieldClassMap !== null
-            ? $this->getDataRowSerializer($returnClass, $fieldClassMap)
-            : $this->getAnySerializer($returnClass);
+        // get return parser, allowing for data row mode
+        $returnElementSerializer = $this->getSerializerForClassOrPrimitive($returnClass, true);
 
         $data = $this->backendMap->$backendName->find($implName, $idClass, $valueTypeMap, $values, $returnElementSerializer->getBackendType(), $returnArray);
 
@@ -181,13 +163,13 @@ class EnvironmentStore {
         foreach ($paramMap as $paramName => $paramValue) {
             // @todo find a way to declare param class?
             $paramClass = is_object($paramValue) ? get_class($paramValue) : null;
-            $paramSerializer = $this->getAnySerializer($paramClass);
+            $paramSerializer = $this->getSerializerForClassOrPrimitive($paramClass);
 
             $paramValueMap[$paramName] = $paramSerializer->extern($paramValue);
             $paramTypeMap[$paramName] = $paramSerializer->getBackendType();
         }
 
-        $returnElementSerializer = $this->getDataRowSerializer('stdClass', $returnTypeMap);
+        $returnElementSerializer = new DataRowSerializer('stdClass', $this->getClassSerializerMap($returnTypeMap));
 
         $data = $this->backendMap->$backendName->retrieve($querySpecMap, $paramTypeMap, $paramValueMap, $returnElementSerializer->getBackendType());
 
@@ -195,23 +177,68 @@ class EnvironmentStore {
         return $returnSerializer->intern($data);
     }
 
-    function isSerializableClass($class) {
-        return property_exists($this->classSerializerCacheMap, $class);
+    private function getRowFieldSerializerMap($className) {
+        $targetClassInfo = new \ReflectionClass($className);
+        $fieldMap = array();
+
+        foreach ($targetClassInfo->getProperties() as $prop) {
+            if ($prop->isStatic()) {
+                continue;
+            }
+
+            if ( ! $prop->isPublic()) {
+                throw new \Exception('row object must only contain public properties');
+            }
+
+            $propTypeInfo = TypeInfo::createForProperty($prop);
+            $fieldMap[$prop->getName()] = $this->getSerializerForType($propTypeInfo);
+        }
+
+        return $fieldMap;
     }
 
-    private function getDataRowSerializer($className, $fieldClassMap) {
+    private function getClassSerializerMap($fieldClassMap) {
         $fieldSerializerMap = array();
 
         // copying strictly only the defined properties
         foreach ($fieldClassMap as $k => $class) {
-            $fieldSerializerMap[$k] = $this->getAnySerializer($class);
+            $fieldSerializerMap[$k] = $this->getSerializerForClassOrPrimitive($class);
         }
 
-        return new DataRowSerializer($className, $fieldSerializerMap);
+        return $fieldSerializerMap;
     }
 
-    private function getAnySerializer($class) {
-        return $class === null ? $this->primitiveSerializer : $this->createClassSerializer($class);
+    /** @return Serializer */
+    private function getSerializerForClassOrPrimitive($class, $allowDataRows = false) {
+        if ($class === null) {
+            return $this->primitiveSerializer;
+        }
+
+        if ($class === 'DateTime') {
+            return $this->dateTimeSerializer;
+        }
+
+        // consistently return shared id serializer instances
+        if (property_exists($this->idSerializerMap, $class)) {
+            return $this->idSerializerMap->$class;
+        }
+
+        // see if marked serializable at all
+        if (!property_exists($this->classSerializerCacheMap, $class)) {
+            if ($allowDataRows) {
+                return new DataRowSerializer($class, $this->getRowFieldSerializerMap($class));
+            }
+
+            throw new \Exception('not a serializable class');
+        }
+
+        // cache the created serializers
+        // @todo simple recursion check
+        if ($this->classSerializerCacheMap->$class === null) {
+            $this->classSerializerCacheMap->$class = new ValueSerializer($class, $this);
+        }
+
+        return $this->classSerializerCacheMap->$class;
     }
 }
 

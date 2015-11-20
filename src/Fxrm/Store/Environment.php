@@ -14,8 +14,6 @@ namespace Fxrm\Store;
  * as a factory.
  */
 class Environment {
-    private static $PRIMITIVE_TYPES = array('string', 'integer', 'int'); // @todo add more
-
     /** @var EnvironmentStore */ private $store;
 
     /**
@@ -197,8 +195,9 @@ class Environment {
             throw new \Exception('getters must have one parameter');
         }
 
-        if ($signature->returnArray || $signature->returnFieldMap) {
-            throw new \Exception('getters cannot return arrays or row objects');
+        // @todo check if serializable
+        if ($signature->returnTypeInfo->getIsArray()) {
+            throw new \Exception('getters cannot return arrays');
         }
 
         if ( ! preg_match('/([^\\\\]+)Id$/', $signature->firstParameterClass, $idMatch)) {
@@ -220,7 +219,7 @@ class Environment {
         $source[] = var_export($signature->fullName, true) . ', ';
         $source[] = var_export($signature->firstParameterClass, true) . ', ';
         $source[] = '$a0, ';
-        $source[] = var_export($signature->returnType, true) . ', ';
+        $source[] = var_export($signature->returnTypeInfo->getElementClassName(), true) . ', ';
         $source[] = var_export($propertyName, true);
         $source[] = ');';
         $source[] = '}';
@@ -264,14 +263,13 @@ class Environment {
     }
 
     private function defineFinder($signature) {
-        $backendName = $this->store->getBackendName($signature->fullName, $signature->returnType, null);
+        $backendName = $this->store->getBackendName($signature->fullName, $signature->returnTypeInfo->getElementClassName(), null);
 
         $source[] = $signature->preamble . ' {';
         $source[] = 'return $this->s->find(';
         $source[] = var_export($backendName, true) . ', ';
         $source[] = var_export($signature->fullName, true) . ', ';
-        $source[] = var_export($signature->returnType, true) . ', ';
-        $source[] = var_export($signature->returnFieldMap, true) . ', ';
+        $source[] = var_export($signature->returnTypeInfo->getElementClassName(), true) . ', ';
         $source[] = 'array(';
 
         $count = 0;
@@ -286,35 +284,11 @@ class Environment {
         }
 
         $source[] = '),';
-        $source[] = $signature->returnArray ? 'true' : 'false';
+        $source[] = $signature->returnTypeInfo->getIsArray() ? 'true' : 'false';
         $source[] = ');';
         $source[] = '}';
 
         return join('', $source);
-    }
-
-    private function getRealClass(\ReflectionClass $declaringClass, $classHint) {
-        // convert to full class name
-        if (array_search($classHint, self::$PRIMITIVE_TYPES) !== FALSE) {
-            return null;
-        } elseif ($classHint === 'object') {
-            // special object shorthand
-            return '\\stdClass';
-        } else {
-            return $classHint[0] === '\\' ?
-                substr($classHint, 1) :
-                $declaringClass->getNamespaceName() . '\\' . $classHint;
-        }
-    }
-
-    private function getPropertyClass(\ReflectionProperty $prop) {
-        if (preg_match('/@var\\s+(\\S+)/', $prop->getDocComment(), $commentMatch)) {
-            $targetIdClassHint = $commentMatch[1];
-
-            return $this->getRealClass($prop->getDeclaringClass(), $targetIdClassHint);
-        }
-
-        return null;
     }
 
     private function getSignature(\ReflectionMethod $info) {
@@ -324,54 +298,10 @@ class Environment {
 
         $signature->fullName = $info->getDeclaringClass()->getName() . '\\' . $signature->name;
 
-        $comment = $info->getDocComment();
-        if (preg_match('/@return\\s+(\\S+)/', $comment, $commentMatch)) {
-            // flag for semantic auto-magic, even for primitives
-            // @todo handle "void"
-            $signature->hasDeclaredReturnType = true;
+        $signature->hasDeclaredReturnType = !!preg_match('/@return\\s+\\S+/', $info->getDocComment());
 
-            // @todo ignore standard names like "string" and others
-            $targetIdClassHint = $commentMatch[1];
-
-            $isArray = substr($targetIdClassHint, -2) === '[]';
-
-            if ($isArray) {
-                $targetIdClassHint = substr($targetIdClassHint, 0, -2);
-            }
-
-            $targetIdClass = $this->getRealClass($info->getDeclaringClass(), $targetIdClassHint);
-
-            $fieldMap = null;
-
-            if ($targetIdClass !== null) {
-                $targetClassInfo = new \ReflectionClass($targetIdClass);
-
-                if ( ! $this->store->isSerializableClass($targetIdClass)) {
-                    $fieldMap = array();
-
-                    foreach ($targetClassInfo->getProperties() as $prop) {
-                        if ($prop->isStatic()) {
-                            continue;
-                        }
-
-                        if ( ! $prop->isPublic()) {
-                            throw new \Exception('row object must only contain public properties');
-                        }
-
-                        $fieldMap[$prop->getName()] = $this->getPropertyClass($prop);
-                    }
-                }
-            }
-
-            $signature->returnArray = $isArray;
-            $signature->returnType = $targetIdClass;
-            $signature->returnFieldMap = $fieldMap;
-        } else {
-            $signature->hasDeclaredReturnType = false;
-            $signature->returnArray = false;
-            $signature->returnType = null;
-            $signature->returnFieldMap = null;
-        }
+        $typeInfo = TypeInfo::createForMethodReturn($info);
+        $signature->returnTypeInfo = $typeInfo;
 
         $signature->parameters = (object)array();
         foreach ($info->getParameters() as $param) {

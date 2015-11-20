@@ -278,7 +278,7 @@ class EnvironmentTest extends \PHPUnit_Framework_TestCase {
                 'Fxrm\\Store\\TEST_ENV_GETTER_OBJECT\\getTEST_ENV_TestProperty',
                 'Fxrm\\Store\\TEST_ENV_Id',
                 $id,
-                '\\stdClass',
+                'stdClass',
                 'testProperty'
             );
 
@@ -293,16 +293,6 @@ class EnvironmentTest extends \PHPUnit_Framework_TestCase {
     public function testGetterArray() {
         $this->setExpectedException('Exception');
         $this->env->implement('Fxrm\\Store\\TEST_ENV_GETTER_ARRAY');
-    }
-
-    public function testGetterRow() {
-        // non-serializable class is interpreted as row object
-        $this->store->expects($this->any())
-            ->method('isSerializableClass')
-            ->will($this->returnValue(false));
-
-        $this->setExpectedException('Exception');
-        $this->env->implement('Fxrm\\Store\\TEST_ENV_GETTER_ROW');
     }
 
     public function testGetterNonId() {
@@ -377,7 +367,6 @@ class EnvironmentTest extends \PHPUnit_Framework_TestCase {
                 'TEST_BACKEND',
                 'Fxrm\\Store\\TEST_ENV_FINDER\\testFinderMethod',
                 'Fxrm\\Store\\TEST_ENV_Id',
-                null,
                 array(
                     'testProperty' => array('Fxrm\\Store\\TEST_ENV_VALUE', $val)
                 ),
@@ -388,44 +377,36 @@ class EnvironmentTest extends \PHPUnit_Framework_TestCase {
         $this->assertSame('TEST_VALUE', $impl->testFinderMethod($val));
     }
 
-    public function testFinderRowStatic() {
+    public function testFinderMultiRow() {
         $this->store->expects($this->any())
             ->method('getBackendName')->with(
-                'Fxrm\\Store\\TEST_ENV_FINDER_ROW_STATIC\\testFinderMethod',
-                'Fxrm\\Store\\TEST_ENV_ROW_STATIC',
+                'Fxrm\\Store\\TEST_ENV_FINDER_MULTI_ROW\\testFinderMethod',
+                'Fxrm\\Store\\TEST_ENV_ROW_DECORATED',
                 null
             )
             ->will($this->returnValue('TEST_BACKEND'));
 
         $this->store->expects($this->any())
             ->method('isSerializableClass')
-            ->will($this->returnValue(false));
+            ->with('Fxrm\\Store\\TEST_ENV_Id')
+            ->will($this->returnValue(true));
 
         $val = new TEST_ENV_VALUE();
-        $impl = $this->env->implement('Fxrm\\Store\\TEST_ENV_FINDER_ROW_STATIC');
+        $impl = $this->env->implement('Fxrm\\Store\\TEST_ENV_FINDER_MULTI_ROW');
 
         $this->store->expects($this->once())
             ->method('find')->with(
                 'TEST_BACKEND',
-                'Fxrm\\Store\\TEST_ENV_FINDER_ROW_STATIC\\testFinderMethod',
-                'Fxrm\\Store\\TEST_ENV_ROW_STATIC',
-                array(
-                    'a' => null
-                ),
+                'Fxrm\\Store\\TEST_ENV_FINDER_MULTI_ROW\\testFinderMethod',
+                'Fxrm\\Store\\TEST_ENV_ROW_DECORATED',
                 array(
                     'testProperty' => array('Fxrm\\Store\\TEST_ENV_VALUE', $val)
                 ),
-                false
+                true
             )
             ->will($this->returnValue('TEST_VALUE'));
 
         $this->assertSame('TEST_VALUE', $impl->testFinderMethod($val));
-    }
-
-    public function testFinderRowPrivate() {
-        // @todo a more specific error class
-        $this->setExpectedException('Exception');
-        $this->env->implement('Fxrm\\Store\\TEST_ENV_FINDER_ROW_PRIVATE');
     }
 
     public function testFinderRowDecorated() {
@@ -450,9 +431,6 @@ class EnvironmentTest extends \PHPUnit_Framework_TestCase {
                 'Fxrm\\Store\\TEST_ENV_FINDER_ROW_DECORATED\\testFinderMethod',
                 'Fxrm\\Store\\TEST_ENV_ROW_DECORATED',
                 array(
-                    'a' => 'Fxrm\\Store\\TEST_ENV_VALUE'
-                ),
-                array(
                     'testProperty' => array('Fxrm\\Store\\TEST_ENV_VALUE', $val)
                 ),
                 false
@@ -466,9 +444,6 @@ class EnvironmentTest extends \PHPUnit_Framework_TestCase {
 // using random field value to help find mismatch during assertions
 class TEST_ENV_Id { function __construct() { $this->v = rand(); } }
 class TEST_ENV_VALUE { function __construct() { $this->v = rand(); } }
-class TEST_ENV_ROW { public $a; }
-class TEST_ENV_ROW_STATIC { public static $s; public $a; }
-class TEST_ENV_ROW_PRIVATE { private $a; }
 class TEST_ENV_ROW_DECORATED { /** @var TEST_ENV_VALUE */ public $a; }
 
 abstract class TEST_ENV_EMPTY {
@@ -497,10 +472,6 @@ interface TEST_ENV_GETTER_EXTRA_ARGS {
 
 interface TEST_ENV_GETTER_ARRAY {
     /** @return TEST_ENV_VALUE[] */ function getTEST_ENV_TestProperty(TEST_ENV_Id $id);
-}
-
-interface TEST_ENV_GETTER_ROW {
-    /** @return TEST_ENV_ROW */ function getTEST_ENV_TestProperty(TEST_ENV_Id $id);
 }
 
 interface TEST_ENV_GETTER_NON_ID {
@@ -538,12 +509,8 @@ interface TEST_ENV_FINDER {
     /** @return TEST_ENV_Id */ function testFinderMethod(TEST_ENV_VALUE $testProperty);
 }
 
-interface TEST_ENV_FINDER_ROW_STATIC {
-    /** @return TEST_ENV_ROW_STATIC */ function testFinderMethod(TEST_ENV_VALUE $testProperty);
-}
-
-interface TEST_ENV_FINDER_ROW_PRIVATE {
-    /** @return TEST_ENV_ROW_PRIVATE */ function testFinderMethod(TEST_ENV_VALUE $testProperty);
+interface TEST_ENV_FINDER_MULTI_ROW {
+    /** @return TEST_ENV_ROW_DECORATED[] */ function testFinderMethod(TEST_ENV_VALUE $testProperty);
 }
 
 interface TEST_ENV_FINDER_ROW_DECORATED {

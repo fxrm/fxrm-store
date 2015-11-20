@@ -12,45 +12,6 @@ class EnvironmentStoreTest extends \PHPUnit_Framework_TestCase {
         new EnvironmentStore(array('TEST_BACKEND' => new \DateTime()), array(), array(), array());
     }
 
-    public function testSerializerDateTime() {
-        $s = new EnvironmentStore(array(), array(), array(), array());
-
-        $ser = $s->createClassSerializer('DateTime');
-
-        $this->assertInstanceOf('Fxrm\\Store\\PassthroughSerializer', $ser);
-        $this->assertSame(Backend::DATE_TIME_TYPE, $ser->getBackendType());
-    }
-
-    public function testSerializerIdentityIsSame() {
-        $s = new EnvironmentStore(
-            array('TEST_BACKEND' => $this->backend),
-            array('Fxrm\\Store\\TEST_CLASS_ID' => 'TEST_BACKEND'),
-            array(),
-            array()
-        );
-
-        $ser = $s->createClassSerializer('Fxrm\\Store\\TEST_CLASS_ID');
-        $ser2 = $s->createClassSerializer('Fxrm\\Store\\TEST_CLASS_ID');
-
-        $this->assertInstanceOf('Fxrm\\Store\\IdentitySerializer', $ser);
-        $this->assertSame($ser, $ser2);
-    }
-
-    public function testSerializerValue() {
-        $s = new EnvironmentStore(array(), array(), array('Fxrm\\Store\\TEST_CLASS_VALUE'), array());
-
-        $ser = $s->createClassSerializer('Fxrm\\Store\\TEST_CLASS_VALUE');
-        $this->assertInstanceOf('Fxrm\\Store\\ValueSerializer', $ser);
-        $this->assertEquals((object)array('a' => null, 'b' => 'bee'), $ser->extern(new TEST_CLASS_VALUE()));
-    }
-
-    public function testSerializerUnknown() {
-        $s = new EnvironmentStore(array(), array(), array(), array());
-
-        $this->setExpectedException('Exception');
-        $s->createClassSerializer('Fxrm\\Store\\TEST_CLASS_VALUE');
-    }
-
     public function testExternNonIdentity() {
         $s = new EnvironmentStore(array(), array(), array('Fxrm\\Store\\TEST_CLASS_VALUE'), array());
 
@@ -132,23 +93,6 @@ class EnvironmentStoreTest extends \PHPUnit_Framework_TestCase {
         );
 
         $this->assertSame('TEST_BACKEND', $s->getBackendName('TEST_NS\\TEST_CLASS\\TEST_METHOD', 'Fxrm\\Store\\TEST_CLASS_ID', null));
-    }
-
-    public function testDateTimeIsSerializable() {
-        $s = new EnvironmentStore(array(), array(), array(), array());
-        $this->assertTrue($s->isSerializableClass('DateTime'));
-    }
-
-    public function testCustomClassesAreSerializable() {
-        $s = new EnvironmentStore(
-            array('TEST_BACKEND' => $this->backend),
-            array('Fxrm\\Store\\TEST_CLASS_ID' => 'TEST_BACKEND'),
-            array('Fxrm\\Store\\TEST_CLASS_VALUE'),
-            array()
-        );
-        $this->assertFalse($s->isSerializableClass('Fxrm\\Store\\TEST_CLASS_OTHER'));
-        $this->assertTrue($s->isSerializableClass('Fxrm\\Store\\TEST_CLASS_ID'));
-        $this->assertTrue($s->isSerializableClass('Fxrm\\Store\\TEST_CLASS_VALUE'));
     }
 
     public function testGet() {
@@ -238,7 +182,6 @@ class EnvironmentStoreTest extends \PHPUnit_Framework_TestCase {
             'TEST_BACKEND',
             'TEST_NS\\TEST_CLASS\\TEST_METHOD',
             'Fxrm\\Store\\TEST_CLASS_ID',
-            null,
             array(
                 'TEST_PROPERTY' => array('Fxrm\\Store\\TEST_CLASS_VALUE', new TEST_CLASS_VALUE())
             ),
@@ -267,22 +210,19 @@ class EnvironmentStoreTest extends \PHPUnit_Framework_TestCase {
                 array('TEST_PROPERTY' => array('a' => null, 'b' => null)),
                 array('TEST_PROPERTY' => (object)array('a' => null, 'b' => 'bee')),
                 array(
-                    'TEST_ROW_PROP' => null
+                    'c' => null
                 ),
                 true
             )
             ->will($this->returnValue(array(
-                (object)array('TEST_ROW_PROP' => 'TEST_ID_STRING 1'),
-                (object)array('TEST_ROW_PROP' => 'TEST_ID_STRING 2')
+                (object)array('c' => 'TEST_ID_STRING 1'),
+                (object)array('c' => 'TEST_ID_STRING 2')
             )));
 
         $result = $s->find(
             'TEST_BACKEND',
             'TEST_NS\\TEST_CLASS\\TEST_METHOD',
-            'stdClass',
-            array(
-                'TEST_ROW_PROP' => 'Fxrm\\Store\\TEST_CLASS_ID'
-            ),
+            'Fxrm\\Store\\TEST_CLASS_ROW',
             array(
                 'TEST_PROPERTY' => array('Fxrm\\Store\\TEST_CLASS_VALUE', new TEST_CLASS_VALUE())
             ),
@@ -290,10 +230,10 @@ class EnvironmentStoreTest extends \PHPUnit_Framework_TestCase {
         );
 
         $this->assertCount(2, $result);
-        $this->assertSame('stdClass', get_class($result[0]));
-        $this->assertSame('TEST_ID_STRING 1', $s->extern($result[0]->TEST_ROW_PROP));
-        $this->assertSame('stdClass', get_class($result[1]));
-        $this->assertSame('TEST_ID_STRING 2', $s->extern($result[1]->TEST_ROW_PROP));
+        $this->assertSame('Fxrm\\Store\\TEST_CLASS_ROW', get_class($result[0]));
+        $this->assertSame('TEST_ID_STRING 1', $s->extern($result[0]->c));
+        $this->assertSame('Fxrm\\Store\\TEST_CLASS_ROW', get_class($result[1]));
+        $this->assertSame('TEST_ID_STRING 2', $s->extern($result[1]->c));
     }
 
     public function testFindSingle() {
@@ -321,7 +261,6 @@ class EnvironmentStoreTest extends \PHPUnit_Framework_TestCase {
             'TEST_BACKEND',
             'TEST_NS\\TEST_CLASS\\TEST_METHOD',
             'Fxrm\\Store\\TEST_CLASS_ID',
-            null,
             array(
                 'TEST_PROPERTY' => array('Fxrm\\Store\\TEST_CLASS_VALUE', new TEST_CLASS_VALUE())
             ),
@@ -331,15 +270,13 @@ class EnvironmentStoreTest extends \PHPUnit_Framework_TestCase {
         $this->assertSame('TEST_ID_STRING single', $s->extern($result));
     }
 
-    public function testFindSingleRow() {
+    public function testFindRowStatic() {
         $s = new EnvironmentStore(
             array('TEST_BACKEND' => $this->backend),
             array('Fxrm\\Store\\TEST_CLASS_ID' => 'TEST_BACKEND'),
             array('Fxrm\\Store\\TEST_CLASS_VALUE'),
             array()
         );
-
-        $obj = $s->intern('Fxrm\\Store\\TEST_CLASS_ID', 'TEST_ID_STRING');
 
         $this->backend->expects($this->once())
             ->method('find')->with(
@@ -348,36 +285,72 @@ class EnvironmentStoreTest extends \PHPUnit_Framework_TestCase {
                 array('TEST_PROPERTY' => array('a' => null, 'b' => null)),
                 array('TEST_PROPERTY' => (object)array('a' => null, 'b' => 'bee')),
                 array(
-                    'TEST_ROW_PROP1' => array('a' => null, 'b' => null),
-                    'TEST_ROW_PROP2' => null
+                    'x' => null
                 ),
-                false
+                true
             )
-            ->will($this->returnValue((object)array(
-                'TEST_ROW_PROP1' => (object)array('a' => 'eee', 'b' => 'oooo'),
-                'TEST_ROW_PROP2' => 'TEST_ID_STRING sub'
+            ->will($this->returnValue(array(
+                (object)array('x' => 'TEST_ID_STRING 1'),
+                (object)array('x' => 'TEST_ID_STRING 2')
             )));
 
         $result = $s->find(
             'TEST_BACKEND',
             'TEST_NS\\TEST_CLASS\\TEST_METHOD',
-            'stdClass',
-            array(
-                'TEST_ROW_PROP1' => 'Fxrm\\Store\\TEST_CLASS_VALUE',
-                'TEST_ROW_PROP2' => 'Fxrm\\Store\\TEST_CLASS_ID'
-            ),
+            'Fxrm\\Store\\TEST_CLASS_ROW_STATIC',
             array(
                 'TEST_PROPERTY' => array('Fxrm\\Store\\TEST_CLASS_VALUE', new TEST_CLASS_VALUE())
             ),
-            false
+            true
         );
 
-        $this->assertSame('stdClass', get_class($result));
-        $expectedObject = new TEST_CLASS_VALUE();
-        $expectedObject->a = 'eee';
-        $expectedObject->b = 'oooo';
-        $this->assertEquals($expectedObject, $result->TEST_ROW_PROP1);
-        $this->assertSame('TEST_ID_STRING sub', $s->extern($result->TEST_ROW_PROP2));
+        $this->assertCount(2, $result);
+        $this->assertSame('Fxrm\\Store\\TEST_CLASS_ROW_STATIC', get_class($result[0]));
+        $this->assertSame('TEST_ID_STRING 1', $result[0]->x);
+        $this->assertSame('Fxrm\\Store\\TEST_CLASS_ROW_STATIC', get_class($result[1]));
+        $this->assertSame('TEST_ID_STRING 2', $result[1]->x);
+    }
+
+    public function testFindRowPrivate() {
+        $s = new EnvironmentStore(
+            array('TEST_BACKEND' => $this->backend),
+            array('Fxrm\\Store\\TEST_CLASS_ID' => 'TEST_BACKEND'),
+            array('Fxrm\\Store\\TEST_CLASS_VALUE'),
+            array()
+        );
+
+        // @todo proper error class
+        $this->setExpectedException('Exception');
+        $s->find(
+            'TEST_BACKEND',
+            'TEST_NS\\TEST_CLASS\\TEST_METHOD',
+            'Fxrm\\Store\\TEST_CLASS_ROW_PRIVATE',
+            array(
+                'TEST_PROPERTY' => array('Fxrm\\Store\\TEST_CLASS_VALUE', new TEST_CLASS_VALUE())
+            ),
+            true
+        );
+    }
+
+    public function testFindRowArray() {
+        $s = new EnvironmentStore(
+            array('TEST_BACKEND' => $this->backend),
+            array('Fxrm\\Store\\TEST_CLASS_ID' => 'TEST_BACKEND'),
+            array('Fxrm\\Store\\TEST_CLASS_VALUE'),
+            array()
+        );
+
+        // @todo proper error class
+        $this->setExpectedException('Exception');
+        $s->find(
+            'TEST_BACKEND',
+            'TEST_NS\\TEST_CLASS\\TEST_METHOD',
+            'Fxrm\\Store\\TEST_CLASS_ROW_ARRAY',
+            array(
+                'TEST_PROPERTY' => array('Fxrm\\Store\\TEST_CLASS_VALUE', new TEST_CLASS_VALUE())
+            ),
+            true
+        );
     }
 
     public function testRetrieve() {
@@ -422,7 +395,26 @@ class EnvironmentStoreTest extends \PHPUnit_Framework_TestCase {
 }
 
 class TEST_CLASS_OTHER {}
+
 class TEST_CLASS_ID {}
+
 class TEST_CLASS_VALUE {
     public $a, $b = 'bee';
+}
+
+class TEST_CLASS_ROW {
+    /** @var TEST_CLASS_ID */ public $c;
+}
+
+class TEST_CLASS_ROW_STATIC {
+    public static $stat;
+    /** @var int */ public $x;
+}
+
+class TEST_CLASS_ROW_PRIVATE {
+    /** @var int */ private $x;
+}
+
+class TEST_CLASS_ROW_ARRAY {
+    /** @var string[] */ public $x;
 }

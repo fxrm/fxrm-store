@@ -37,26 +37,17 @@ class TypeInfo {
         }
     }
 
-    /**
-     * @return Serializer
-     */
-    public function createSerializer(EnvironmentStore $store) {
-        // @todo primitive types
-        $elementSerializer = $this->classInfo === null
-            ? new PassthroughSerializer()
-            : $store->createClassSerializer($this->classInfo->getName());
-
-        return $this->isArray ?
-            new ArraySerializer($elementSerializer) :
-            $elementSerializer;
-    }
-
     public function getIsArray() {
         return $this->isArray;
     }
 
+    // @todo have an element class getter and a standalone class getter (mutually exclusive)
     public function getElementClass() {
         return $this->classInfo;
+    }
+
+    public function getElementClassName() {
+        return $this->classInfo !== null ? $this->classInfo->getName() : null;
     }
 
     public static function createForProperty(\ReflectionProperty $prop) {
@@ -65,5 +56,13 @@ class TypeInfo {
             null;
 
         return new self($prop->getDeclaringClass(), $hint);
+    }
+
+    public static function createForMethodReturn(\ReflectionMethod $info) {
+        $hint = preg_match('/@return\\s+(\\S+)/', $info->getDocComment(), $commentMatch) ?
+            $commentMatch[1] :
+            null;
+
+        return new self($info->getDeclaringClass(), $hint);
     }
 }
