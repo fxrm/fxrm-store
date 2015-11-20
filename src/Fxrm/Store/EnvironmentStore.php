@@ -169,12 +169,24 @@ class EnvironmentStore {
             $paramTypeMap[$paramName] = $paramSerializer->getBackendType();
         }
 
-        $returnElementSerializer = new DataRowSerializer('stdClass', $this->getClassSerializerMap($returnTypeMap));
+        // not using DataRowSerializer because it ignores non-declared result properties
+        $fieldSerializerMap = array_map(array($this, 'getSerializerForClassOrPrimitive'), $returnTypeMap);
 
-        $data = $this->backendMap->$backendName->retrieve($querySpecMap, $paramTypeMap, $paramValueMap, $returnElementSerializer->getBackendType());
+        $backendTypeMap = array_map(
+            function (Serializer $v) { return $v->getBackendType(); },
+            $fieldSerializerMap
+        );
 
-        $returnSerializer = new ArraySerializer($returnElementSerializer);
-        return $returnSerializer->intern($data);
+        $data = $this->backendMap->$backendName->retrieve($querySpecMap, $paramTypeMap, $paramValueMap, $backendTypeMap);
+
+        foreach ($data as &$value) {
+            /** @var Serializer $ser */
+            foreach ($fieldSerializerMap as $k => $ser) {
+                $value->$k = $ser->intern($value->$k);
+            }
+        }
+
+        return $data;
     }
 
     private function getRowFieldSerializerMap($className) {
@@ -195,17 +207,6 @@ class EnvironmentStore {
         }
 
         return $fieldMap;
-    }
-
-    private function getClassSerializerMap($fieldClassMap) {
-        $fieldSerializerMap = array();
-
-        // copying strictly only the defined properties
-        foreach ($fieldClassMap as $k => $class) {
-            $fieldSerializerMap[$k] = $this->getSerializerForClassOrPrimitive($class);
-        }
-
-        return $fieldSerializerMap;
     }
 
     /** @return Serializer */

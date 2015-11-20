@@ -361,8 +361,6 @@ class EnvironmentStoreTest extends \PHPUnit_Framework_TestCase {
             array()
         );
 
-        $obj = $s->intern('Fxrm\\Store\\TEST_CLASS_ID', 'TEST_ID_STRING');
-
         $this->backend->expects($this->once())
             ->method('retrieve')->with(
                 'TEST_QUERY_SPEC_MAP',
@@ -387,10 +385,52 @@ class EnvironmentStoreTest extends \PHPUnit_Framework_TestCase {
 
         $this->assertCount(1, $result);
 
+        $this->assertSame('stdClass', get_class($result[0]));
+        $this->assertObjectHasAttribute('TEST_RESULT_PROP', $result[0]);
+
         $expectedObject = new TEST_CLASS_VALUE();
         $expectedObject->a = 'aaa';
         $expectedObject->b = null;
         $this->assertEquals($expectedObject, $result[0]->TEST_RESULT_PROP);
+    }
+
+    public function testRetrieveUndeclaredProperties() {
+        $s = new EnvironmentStore(
+            array('TEST_BACKEND' => $this->backend),
+            array('Fxrm\\Store\\TEST_CLASS_ID' => 'TEST_BACKEND'),
+            array('Fxrm\\Store\\TEST_CLASS_VALUE'),
+            array()
+        );
+
+        $this->backend->expects($this->once())
+            ->method('retrieve')->with(
+                'TEST_QUERY_SPEC_MAP',
+                array('TEST_PARAM' => array('a' => null, 'b' => null)),
+                array('TEST_PARAM' => (object)array('a' => null, 'b' => 'bee')),
+                array()
+            )
+            ->will($this->returnValue(array(
+                (object)array(
+                    'TEST_UNDECLARED_PROP' => 12345
+                )
+            )));
+
+        $result = $s->retrieve(
+            'TEST_BACKEND',
+            'TEST_QUERY_SPEC_MAP',
+            array(
+                'TEST_PARAM' => new TEST_CLASS_VALUE()
+            ),
+            array(
+                // no declared properties
+            )
+        );
+
+        $this->assertCount(1, $result);
+
+        // ensure undeclared property keys are returned as well
+        $this->assertObjectHasAttribute('TEST_UNDECLARED_PROP', $result[0]);
+        $this->assertSame(12345, $result[0]->TEST_UNDECLARED_PROP);
     }
 }
 
