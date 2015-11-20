@@ -11,9 +11,9 @@ class DataRowSerializer implements Serializer {
     private $className;
     private $fieldSerializerMap;
 
-    function __construct($className, $fieldSerializerMap) {
+    function __construct($className, EnvironmentStore $store) {
         $this->className = $className;
-        $this->fieldSerializerMap = $fieldSerializerMap;
+        $this->fieldSerializerMap = self::getRowFieldSerializerMap($className, $store);
     }
 
     function getBackendType() {
@@ -41,5 +41,25 @@ class DataRowSerializer implements Serializer {
         }
 
         return $result;
+    }
+
+    private static function getRowFieldSerializerMap($className, EnvironmentStore $store) {
+        $targetClassInfo = new \ReflectionClass($className);
+        $fieldMap = array();
+
+        foreach ($targetClassInfo->getProperties() as $prop) {
+            if ($prop->isStatic()) {
+                continue;
+            }
+
+            if ( ! $prop->isPublic()) {
+                throw new \Exception('row object must only contain public properties');
+            }
+
+            $propTypeInfo = TypeInfo::createForProperty($prop);
+            $fieldMap[$prop->getName()] = $store->getSerializerForType($propTypeInfo);
+        }
+
+        return $fieldMap;
     }
 }

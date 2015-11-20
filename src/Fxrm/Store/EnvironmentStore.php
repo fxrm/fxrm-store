@@ -189,26 +189,6 @@ class EnvironmentStore {
         return $data;
     }
 
-    private function getRowFieldSerializerMap($className) {
-        $targetClassInfo = new \ReflectionClass($className);
-        $fieldMap = array();
-
-        foreach ($targetClassInfo->getProperties() as $prop) {
-            if ($prop->isStatic()) {
-                continue;
-            }
-
-            if ( ! $prop->isPublic()) {
-                throw new \Exception('row object must only contain public properties');
-            }
-
-            $propTypeInfo = TypeInfo::createForProperty($prop);
-            $fieldMap[$prop->getName()] = $this->getSerializerForType($propTypeInfo);
-        }
-
-        return $fieldMap;
-    }
-
     /** @return Serializer */
     private function getSerializerForClassOrPrimitive($class, $allowDataRows = false) {
         if ($class === null) {
@@ -227,7 +207,7 @@ class EnvironmentStore {
         // see if marked serializable at all
         if (!property_exists($this->classSerializerCacheMap, $class)) {
             if ($allowDataRows) {
-                return new DataRowSerializer($class, $this->getRowFieldSerializerMap($class));
+                return new DataRowSerializer($class, $this);
             }
 
             throw new \Exception('not a serializable class');
