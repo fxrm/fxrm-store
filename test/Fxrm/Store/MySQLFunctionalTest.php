@@ -120,6 +120,16 @@ class MySQLFunctionalTest extends \PHPUnit_Framework_TestCase {
         $this->assertNull($result);
     }
 
+    public function testMultiFindByTuple() {
+        $result = $this->backend->find('\\', 'Foo\\MyTupleTestId', array(
+            'test' => array('myProp' => null, 'myDate' => Backend::DATE_TIME_TYPE)
+        ), array(
+            'test' => (object)array('myProp' => 'v1', 'myDate' => new \DateTime('1970-01-01 00:00:01 UTC')
+        )), null, true);
+
+        $this->assertEquals(array(1), $result);
+    }
+
     public function testSetJSON() {
         $typeMap = array(array('json!' => null));
 

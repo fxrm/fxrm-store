@@ -27,10 +27,23 @@ abstract class PDOBackend extends Backend {
     }
 
     final function find($method, $entity, $valueTypeMap, $valueMap, $returnType, $multiple) {
-        $stmt = $this->pdo->prepare($this->getCustomQuery($method) ?: $this->generateFindQuery($this->getEntityName($entity), array_keys($valueMap), $multiple));
+        $stmt = $this->pdo->prepare($this->getCustomQuery($method) ?: $this->generateFindQuery(
+            $this->getEntityName($entity),
+            $this->getFlattenedFieldList($entity, array_keys($valueMap), $valueTypeMap),
+            $multiple
+        ));
 
         foreach ($valueMap as $field => $value) {
-            $this->bindStatementValue($stmt, ':' . $field, $this->fromValue($valueTypeMap[$field], $value));
+            $valueType = $valueTypeMap[$field];
+
+            if ($this->getIsTupleProperty($entity, $field)) {
+                // null $value is not tolerated by design (@todo add explicit null check throw?)
+                foreach ($valueType as $k => $kType) {
+                    $this->bindStatementValue($stmt, ':' . $field . '__' . $k, $this->fromValue($kType, $value->$k));
+                }
+            } else {
+                $this->bindStatementValue($stmt, ':' . $field, $this->fromValue($valueType, $value));
+            }
         }
 
         $stmt->execute();
@@ -128,6 +141,7 @@ abstract class PDOBackend extends Backend {
             $valueType = $valueTypeMap[$field];
 
             if ($this->getIsTupleProperty($entity, $field)) {
+                // null $value is not tolerated by design (@todo add explicit null check throw?)
                 foreach ($valueType as $k => $kType) {
                     $this->bindStatementValue($stmt, ':' . $field . '__' . $k, $this->fromValue($kType, $value->$k));
                 }
