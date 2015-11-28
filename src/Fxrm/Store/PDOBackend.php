@@ -110,24 +110,6 @@ abstract class PDOBackend extends Backend {
         }
     }
 
-    private function getFlattenedFieldList($entity, $fieldList, &$valueTypeMap) {
-        $result = array();
-
-        foreach ($fieldList as $field) {
-            $valueType = $valueTypeMap[$field];
-
-            if ($this->getIsTupleProperty($entity, $field)) {
-                foreach ($valueType as $k => $kType) {
-                    $result[] = $field . '$' . $k;
-                }
-            } else {
-                $result[] = $field;
-            }
-        }
-
-        return $result;
-    }
-
     final function set($method, $entity, $id, $valueTypeMap, $valueMap) {
         // @todo use the original model parameter name as query param
         $stmt = $this->pdo->prepare($this->getCustomQuery($method) ?: $this->generateSetQuery(
@@ -330,6 +312,24 @@ abstract class PDOBackend extends Backend {
 
     private function getIsTupleProperty($entity, $field) {
         return array_key_exists($entity . '.' . $field, $this->tuplePropertyMap);
+    }
+
+    private function getFlattenedFieldList($entity, $fieldList, &$valueTypeMap) {
+        $result = array();
+
+        foreach ($fieldList as $field) {
+            $valueType = $valueTypeMap[$field];
+
+            if ($this->getIsTupleProperty($entity, $field)) {
+                foreach ($valueType as $k => $kType) {
+                    $result[] = $field . '$' . $k;
+                }
+            } else {
+                $result[] = $field;
+            }
+        }
+
+        return $result;
     }
 
     private function getEntityName($idClass) {
