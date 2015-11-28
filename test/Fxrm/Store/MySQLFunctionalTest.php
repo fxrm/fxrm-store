@@ -16,6 +16,8 @@ class MySQLFunctionalTest extends \PHPUnit_Framework_TestCase {
             use myapp_test;
             create table MyTest (id INT PRIMARY KEY AUTO_INCREMENT, testProp VARCHAR(255) NULL, testDate INT NULL);
             insert into MyTest (testProp, testDate) VALUES (\'v1\', 1), (\'v2\', 2);
+            create table MyTupleTest (id INT PRIMARY KEY AUTO_INCREMENT, test$myProp VARCHAR(255) NULL, test$myDate INT NULL);
+            insert into MyTupleTest (test$myProp, test$myDate) VALUES (\'v1\', 1), (\'v2\', 2);
         ');
 
         $this->backend = new \Fxrm\Store\MySQLBackend($dsn . ';dbname=myapp_test', $user, $password);
@@ -25,6 +27,7 @@ class MySQLFunctionalTest extends \PHPUnit_Framework_TestCase {
         if ($this->pdo) {
             $this->pdo->exec('
                 drop table MyTest;
+                drop table MyTupleTest;
                 drop database myapp_test;
             ');
         }
@@ -38,6 +41,19 @@ class MySQLFunctionalTest extends \PHPUnit_Framework_TestCase {
         $d = $this->backend->get('\\', 'Foo\\MyTestId', 2, Backend::DATE_TIME_TYPE, 'testDate');
         $this->assertInstanceof('DateTime', $d);
         $this->assertEquals(2, $d->getTimestamp());
+    }
+
+    public function testGetTuple() {
+        $d = $this->backend->get('\\', 'Foo\\MyTupleTestId', 1, array(
+            '$' => null,
+            'myProp' => null,
+            'myDate' => Backend::DATE_TIME_TYPE
+        ), 'test');
+
+        $this->assertInstanceof('stdClass', $d);
+        $this->assertEquals('v1', $d->myProp);
+        $this->assertInstanceof('DateTime', $d->myDate);
+        $this->assertEquals(1, $d->myDate->getTimestamp());
     }
 
     public function testSet() {

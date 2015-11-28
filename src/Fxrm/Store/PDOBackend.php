@@ -52,15 +52,30 @@ abstract class PDOBackend extends Backend {
     }
 
     final function get($method, $entity, $id, $fieldType, $field) {
-        // @todo use the original model parameter name as query param
-        $sql = $this->getCustomQuery($method) ?: $this->generateGetQuery($this->getEntityName($entity), $field);
+        $isTuple = false;
+
+        if (is_array($fieldType) && array_key_exists('$', $fieldType)) {
+            $isTuple = true;
+            unset($fieldType['$']); // type data passed in as copy
+        }
+
+        // @todo use the original model parameter name as custom query param
+        $sql = $this->getCustomQuery($method) ?: $this->generateGetQuery(
+            $this->getEntityName($entity),
+            $isTuple ? array_map(
+                function ($k) use ($field) { return $field . '$' . $k; },
+                array_keys($fieldType)
+            ) : array($field)
+        );
 
         $stmt = $this->pdo->prepare($sql);
         $this->bindStatementValue($stmt, ':id', $id);
         $stmt->execute();
 
         // expecting only a single value per row
-        $rows = $stmt->fetchAll(\PDO::FETCH_COLUMN, 0);
+        $rows = $isTuple
+            ? $stmt->fetchAll(\PDO::FETCH_OBJ)
+            : $stmt->fetchAll(\PDO::FETCH_COLUMN, 0);
 
         $stmt->closeCursor();
 
@@ -69,7 +84,18 @@ abstract class PDOBackend extends Backend {
             throw new \Exception('object not found');
         }
 
-        return $this->toValue($fieldType, $rows[0]);
+        if ($isTuple) {
+            $data = $rows[0];
+            $result = (object)null;
+
+            foreach ($fieldType as $k => $type) {
+                $result->$k = $this->toValue($type, $data->{$field . '$' . $k});
+            }
+
+            return $result;
+        } else {
+            return $this->toValue($fieldType, $rows[0]);
+        }
     }
 
     final function set($method, $entity, $id, $valueTypeMap, $valueMap) {
@@ -306,7 +332,7 @@ abstract class PDOBackend extends Backend {
 
     abstract protected function generateFindQuery($entity, $fieldList, $multiple);
 
-    abstract protected function generateGetQuery($entity, $field);
+    abstract protected function generateGetQuery($entity, $fieldList);
 
     abstract protected function generateSetQuery($entity, $fieldList);
 
