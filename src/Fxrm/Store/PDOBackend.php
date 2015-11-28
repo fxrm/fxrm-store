@@ -16,6 +16,10 @@ abstract class PDOBackend extends Backend {
             ? (array)$options['idGeneratorMap']
             : array();
 
+        $this->tuplePropertyMap = array_key_exists('tuplePropertyList', $options)
+            ? array_fill_keys($options['tuplePropertyList'], null)
+            : array();
+
         $this->pdo = new \PDO($dsn, $user, $password);
 
         $this->pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
@@ -52,12 +56,7 @@ abstract class PDOBackend extends Backend {
     }
 
     final function get($method, $entity, $id, $fieldType, $field) {
-        $isTuple = false;
-
-        if (is_array($fieldType) && array_key_exists('$', $fieldType)) {
-            $isTuple = true;
-            unset($fieldType['$']); // type data passed in as copy
-        }
+        $isTuple = $this->getIsTupleProperty($entity, $field);
 
         // @todo use the original model parameter name as custom query param
         $sql = $this->getCustomQuery($method) ?: $this->generateGetQuery(
@@ -98,31 +97,37 @@ abstract class PDOBackend extends Backend {
         }
     }
 
+    private function getFlattenedFieldList($entity, $fieldList, &$valueTypeMap) {
+        $result = array();
+
+        foreach ($fieldList as $field) {
+            $valueType = $valueTypeMap[$field];
+
+            if ($this->getIsTupleProperty($entity, $field)) {
+                foreach ($valueType as $k => $kType) {
+                    $result[] = $field . '$' . $k;
+                }
+            } else {
+                $result[] = $field;
+            }
+        }
+
+        return $result;
+    }
+
     final function set($method, $entity, $id, $valueTypeMap, $valueMap) {
         // @todo use the original model parameter name as query param
-        $stmt = $this->pdo->prepare($this->getCustomQuery($method) ?: $this->generateSetQuery($this->getEntityName($entity), call_user_func_array('array_merge', array_map(
-            function ($field) use (&$valueTypeMap) {
-                $valueType = $valueTypeMap[$field];
-
-                if (is_array($valueType) && array_key_exists('$', $valueType)) {
-                    unset($valueType['$']); // type data is a copy
-
-                    return array_map(function ($k) use ($field) { return $field . '$' . $k; }, array_keys($valueType));
-                } else {
-                    return array($field);
-                }
-            },
-            array_keys($valueMap)
-        ))));
+        $stmt = $this->pdo->prepare($this->getCustomQuery($method) ?: $this->generateSetQuery(
+            $this->getEntityName($entity),
+            $this->getFlattenedFieldList($entity, array_keys($valueMap), $valueTypeMap)
+        ));
         $this->bindStatementValue($stmt, ':id', $id);
 
         $valueCount = 0;
         foreach ($valueMap as $field => $value) {
             $valueType = $valueTypeMap[$field];
 
-            if (is_array($valueType) && array_key_exists('$', $valueType)) {
-                unset($valueType['$']); // type data is a copy
-
+            if ($this->getIsTupleProperty($entity, $field)) {
                 foreach ($valueType as $k => $kType) {
                     $this->bindStatementValue($stmt, ':' . $field . '__' . $k, $this->fromValue($kType, $value->$k));
                 }
@@ -307,6 +312,10 @@ abstract class PDOBackend extends Backend {
         }
 
         return $result;
+    }
+
+    private function getIsTupleProperty($entity, $field) {
+        return array_key_exists($entity . '.' . $field, $this->tuplePropertyMap);
     }
 
     private function getEntityName($idClass) {

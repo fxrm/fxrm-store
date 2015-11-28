@@ -20,7 +20,11 @@ class MySQLFunctionalTest extends \PHPUnit_Framework_TestCase {
             insert into MyTupleTest (test$myProp, test$myDate) VALUES (\'v1\', 1), (\'v2\', 2);
         ');
 
-        $this->backend = new \Fxrm\Store\MySQLBackend($dsn . ';dbname=myapp_test', $user, $password);
+        $this->backend = new \Fxrm\Store\MySQLBackend($dsn . ';dbname=myapp_test', $user, $password, array(
+            'tuplePropertyList' => array(
+                'Foo\\MyTupleTestId.test'
+            )
+        ));
     }
 
     public function tearDown() {
@@ -45,7 +49,6 @@ class MySQLFunctionalTest extends \PHPUnit_Framework_TestCase {
 
     public function testGetTuple() {
         $d = $this->backend->get('\\', 'Foo\\MyTupleTestId', 1, array(
-            '$' => null,
             'myProp' => null,
             'myDate' => Backend::DATE_TIME_TYPE
         ), 'test');
@@ -66,7 +69,6 @@ class MySQLFunctionalTest extends \PHPUnit_Framework_TestCase {
 
         $this->backend->set('\\', 'Foo\\MyTupleTestId', 1, array(
             'test' => array(
-                '$' => null,
                 'myProp' => null,
                 'myDate' => Backend::DATE_TIME_TYPE
             )
@@ -78,7 +80,6 @@ class MySQLFunctionalTest extends \PHPUnit_Framework_TestCase {
         ));
 
         $d = $this->backend->get('\\', 'Foo\\MyTupleTestId', 1, array(
-            '$' => null,
             'myProp' => null,
             'myDate' => Backend::DATE_TIME_TYPE
         ), 'test');
