@@ -4,7 +4,7 @@ namespace Fxrm\Store;
 
 class MySQLFunctionalTest extends \PHPUnit_Framework_TestCase {
     public function setUp() {
-        $dsn = getenv('TEST_MYSQL_DSN') ?: 'mysql:host=127.0.0.1;port=8889';
+        $dsn = getenv('TEST_MYSQL_DSN') ?: 'mysql:host=127.0.0.1;port=3306';
         $user = getenv('TEST_MYSQL_USER') !== false ? getenv('TEST_MYSQL_USER') : 'root';
         $password = getenv('TEST_MYSQL_PASSWORD') !== false ? getenv('TEST_MYSQL_PASSWORD') : 'root';
 
