@@ -60,7 +60,8 @@ class MySQLBackend extends PDOBackend {
                 $sql[] = ', ';
             }
 
-            $sql[] = '`' . $field . '` = :' . $field; // @todo check for unsafe chars (not important here)
+            // replace tuple $ separator
+            $sql[] = '`' . $field . '` = :' . str_replace('$', '__', $field); // @todo check for unsafe chars (not important here)
         }
 
         $sql[] = ' WHERE id = :id';

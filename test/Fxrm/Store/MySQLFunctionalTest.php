@@ -61,6 +61,34 @@ class MySQLFunctionalTest extends \PHPUnit_Framework_TestCase {
         $this->assertEquals(1, $this->backend->find('\\', 'Foo\\MyTestId', array('testProp' => null), array('testProp' => 'CHANGED'), null, false));
     }
 
+    public function testSetTuple() {
+        $newTime = new \DateTime();
+
+        $this->backend->set('\\', 'Foo\\MyTupleTestId', 1, array(
+            'test' => array(
+                '$' => null,
+                'myProp' => null,
+                'myDate' => Backend::DATE_TIME_TYPE
+            )
+        ), array(
+            'test' => (object)array(
+                'myProp' => 'CHANGED',
+                'myDate' => $newTime
+            )
+        ));
+
+        $d = $this->backend->get('\\', 'Foo\\MyTupleTestId', 1, array(
+            '$' => null,
+            'myProp' => null,
+            'myDate' => Backend::DATE_TIME_TYPE
+        ), 'test');
+
+        $this->assertInstanceof('stdClass', $d);
+        $this->assertEquals('CHANGED', $d->myProp);
+        $this->assertInstanceof('DateTime', $d->myDate);
+        $this->assertEquals($newTime->getTimestamp(), $d->myDate->getTimestamp());
+    }
+
     public function testMultiFind() {
         $result = $this->backend->find('\\', 'Foo\\MyTestId', array('testProp' => null), array('testProp' => 'v2'), null, true);
         $this->assertEquals(array(2), $result);

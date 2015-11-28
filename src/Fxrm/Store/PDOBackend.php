@@ -100,12 +100,36 @@ abstract class PDOBackend extends Backend {
 
     final function set($method, $entity, $id, $valueTypeMap, $valueMap) {
         // @todo use the original model parameter name as query param
-        $stmt = $this->pdo->prepare($this->getCustomQuery($method) ?: $this->generateSetQuery($this->getEntityName($entity), array_keys($valueMap)));
+        $stmt = $this->pdo->prepare($this->getCustomQuery($method) ?: $this->generateSetQuery($this->getEntityName($entity), call_user_func_array('array_merge', array_map(
+            function ($field) use (&$valueTypeMap) {
+                $valueType = $valueTypeMap[$field];
+
+                if (is_array($valueType) && array_key_exists('$', $valueType)) {
+                    unset($valueType['$']); // type data is a copy
+
+                    return array_map(function ($k) use ($field) { return $field . '$' . $k; }, array_keys($valueType));
+                } else {
+                    return array($field);
+                }
+            },
+            array_keys($valueMap)
+        ))));
         $this->bindStatementValue($stmt, ':id', $id);
 
         $valueCount = 0;
         foreach ($valueMap as $field => $value) {
-            $this->bindStatementValue($stmt, ':' . $field, $this->fromValue($valueTypeMap[$field], $value));
+            $valueType = $valueTypeMap[$field];
+
+            if (is_array($valueType) && array_key_exists('$', $valueType)) {
+                unset($valueType['$']); // type data is a copy
+
+                foreach ($valueType as $k => $kType) {
+                    $this->bindStatementValue($stmt, ':' . $field . '__' . $k, $this->fromValue($kType, $value->$k));
+                }
+            } else {
+                $this->bindStatementValue($stmt, ':' . $field, $this->fromValue($valueType, $value));
+            }
+
             $valueCount += 1;
         }
 
