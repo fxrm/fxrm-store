@@ -16,8 +16,8 @@ class MySQLFunctionalTest extends \PHPUnit_Framework_TestCase {
             use myapp_test;
             create table MyTest (id INT PRIMARY KEY AUTO_INCREMENT, testProp VARCHAR(255) NULL, testDate INT NULL);
             insert into MyTest (testProp, testDate) VALUES (\'v1\', 1), (\'v2\', 2);
-            create table MyTupleTest (id INT PRIMARY KEY AUTO_INCREMENT, test$myProp VARCHAR(255) NULL, test$myDate INT NULL);
-            insert into MyTupleTest (test$myProp, test$myDate) VALUES (\'v1\', 1), (\'v2\', 2);
+            create table MyTupleTest (id INT PRIMARY KEY AUTO_INCREMENT, test_myProp VARCHAR(255) NULL, test_myDate INT NULL);
+            insert into MyTupleTest (test_myProp, test_myDate) VALUES (\'v1\', 1), (\'v2\', 2);
         ');
 
         $this->backend = new \Fxrm\Store\MySQLBackend($dsn . ';dbname=myapp_test', $user, $password, array(

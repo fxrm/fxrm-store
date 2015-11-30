@@ -8,6 +8,8 @@
 namespace Fxrm\Store;
 
 abstract class PDOBackend extends Backend {
+    const TUPLE_DELIMITER = '_';
+
     private $pdo;
     private $idGeneratorMap;
 
@@ -39,7 +41,7 @@ abstract class PDOBackend extends Backend {
             if ($this->getIsTupleProperty($entity, $field)) {
                 // null $value is not tolerated by design (@todo add explicit null check throw?)
                 foreach ($valueType as $k => $kType) {
-                    $this->bindStatementValue($stmt, ':' . $field . '__' . $k, $this->fromValue($kType, $value->$k));
+                    $this->bindStatementValue($stmt, ':' . $field . self::TUPLE_DELIMITER . $k, $this->fromValue($kType, $value->$k));
                 }
             } else {
                 $this->bindStatementValue($stmt, ':' . $field, $this->fromValue($valueType, $value));
@@ -70,12 +72,13 @@ abstract class PDOBackend extends Backend {
 
     final function get($method, $entity, $id, $fieldType, $field) {
         $isTuple = $this->getIsTupleProperty($entity, $field);
+        $fieldTuplePrefix = $field . self::TUPLE_DELIMITER;
 
         // @todo use the original model parameter name as custom query param
         $sql = $this->getCustomQuery($method) ?: $this->generateGetQuery(
             $this->getEntityName($entity),
             $isTuple ? array_map(
-                function ($k) use ($field) { return $field . '$' . $k; },
+                function ($k) use ($fieldTuplePrefix) { return $fieldTuplePrefix . $k; },
                 array_keys($fieldType)
             ) : array($field)
         );
@@ -101,7 +104,7 @@ abstract class PDOBackend extends Backend {
             $result = (object)null;
 
             foreach ($fieldType as $k => $type) {
-                $result->$k = $this->toValue($type, $data->{$field . '$' . $k});
+                $result->$k = $this->toValue($type, $data->{$field . self::TUPLE_DELIMITER . $k});
             }
 
             return $result;
@@ -125,7 +128,7 @@ abstract class PDOBackend extends Backend {
             if ($this->getIsTupleProperty($entity, $field)) {
                 // null $value is not tolerated by design (@todo add explicit null check throw?)
                 foreach ($valueType as $k => $kType) {
-                    $this->bindStatementValue($stmt, ':' . $field . '__' . $k, $this->fromValue($kType, $value->$k));
+                    $this->bindStatementValue($stmt, ':' . $field . self::TUPLE_DELIMITER . $k, $this->fromValue($kType, $value->$k));
                 }
             } else {
                 $this->bindStatementValue($stmt, ':' . $field, $this->fromValue($valueType, $value));
@@ -322,7 +325,7 @@ abstract class PDOBackend extends Backend {
 
             if ($this->getIsTupleProperty($entity, $field)) {
                 foreach ($valueType as $k => $kType) {
-                    $result[] = $field . '$' . $k;
+                    $result[] = $field . self::TUPLE_DELIMITER . $k;
                 }
             } else {
                 $result[] = $field;

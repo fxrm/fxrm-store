@@ -34,8 +34,7 @@ class MySQLBackend extends PDOBackend {
                 $sql[] = ' AND ';
             }
 
-            // replace tuple $ separator
-            $sql[] = '`' . $field . '` = :' . str_replace('$', '__', $field); // @todo check for unsafe chars (not important here)
+            $sql[] = '`' . $field . '` = :' . $field; // @todo check for unsafe chars (not important here)
         }
 
         if (count($fieldList) === 0) {
@@ -61,8 +60,7 @@ class MySQLBackend extends PDOBackend {
                 $sql[] = ', ';
             }
 
-            // replace tuple $ separator
-            $sql[] = '`' . $field . '` = :' . str_replace('$', '__', $field); // @todo check for unsafe chars (not important here)
+            $sql[] = '`' . $field . '` = :' . $field; // @todo check for unsafe chars (not important here)
         }
 
         $sql[] = ' WHERE id = :id';
