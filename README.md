@@ -5,21 +5,61 @@
 Fxrm Store
 ==========
 
-A minimalist data access layer (non-traditional ORM) focusing on transparency, [domain-driven design](http://www.infoq.com/presentations/model-to-work-evans) and model testability. Used in production for over two years.
+A minimalist data access layer (non-traditional ORM) focusing on transparency, [domain-driven design](http://www.infoq.com/presentations/model-to-work-evans) and model testability. Used in production for over two years, on a large long-lived codebase with a diverse set of contributing developers.
 
 Built around the notions of [business primitives](http://codebetter.com/drusellers/2010/01/27/business-primitives-1-2/) and **lean identities**. The library does not require injecting any custom parent object classes or special annotation tags into application model code. Actual database implementation code is introduced to the business logic via inversion-of-control, so the business logic is left pristine and fully unit-testable without having Fxrm Store as a test dependency.
 
+Sample definition:
+
+```php
+interface AccountStore {
+    /** @return string */ function getUserFullName(UserId $id);
+    /** @return AccountId */ function getUserParentAccountId(UserId $id);
+    function setUserInfo(UserId $id, $fullName, AccountId $parentAccountId);
+    
+    /** @return UserId[] */ function findUsersByParentAccountId(AccountId $parentAccountId);
+}
+
+class UserId {
+    // intentionally blank
+}
+
+class AccountId {
+    // intentionally blank
+}
+```
+
+Example unit-testable service:
+
+```php
+class SampleService {
+    /** @var AccountStore */ private $store;
+    
+    function __construct(AccountStore $store) {
+        $this->store = $store;
+    }
+    
+    function performBusinessLogic(AccountId $accountId) {
+        foreach ($this->store->findUsersByParentAccountId($accountId) as $userId) {
+            $fullName = $this->store->getUserFullName($userId);
+        }
+    }
+}
+```
+
 ## Mental Model
 
-The philosophy behind the Fxrm Store persistence model is not the same as traditional ORM layers, and drives a lot of the resulting implementation assumptions. This takes as granted that application code comes first, and that database storage schema responds to it, as a separate "downstream" persistence concern.
+The philosophy behind the Fxrm Store persistence model is not the same as traditional ORM layers, and drives many of the resulting implementation assumptions. This takes as granted that application code comes first, and that database storage schema responds to it, as a separate "downstream" persistence concern.
 
-Relational data models are very apt for modeling common business concepts. For example, name and mailing address are not a person's *intrinsic* state, but rather an assigned extrinsic set of attributes: so it is very natural to represent that person as a unique immutable identifier and correlate the associated data as extrinsic values attached to that identifier. Data exists in relation to the identity: neighbouring columns in the same table row.
+Relational data models are very apt for modeling common business concepts. For example, name and mailing address are not a person's *intrinsic* state, but rather an assigned extrinsic set of attributes. Hence, it is very natural to represent that person in code as a unique immutable identifier and correlate the associated data as extrinsic values attached to that identifier. Data exists in relation to the identity: neighbouring columns in the same table row.
 
 Fxrm Store library embraces the philosophy of the relational model deeper than a typical ORM: instead of representing relational columns as simple object fields in an entity class, they are coded as external properties of an *identity* class.
 
 What that means is that the data access layer interfaces contain simple getters and setters for properties that always require an entity identifier to access the corresponding value. E.g. `function setUserName(UserId $id, $name)` sets the value of the `name` column in the `User` table, provided that row's `$id`. The converse `function getUserName(UserId $id)` retrieves the value of the same column. There is a corresponding simple `find` notation, and that's the entirety of the Fxrm data definition language.
 
 An even "purer" approach, for comparison, could be modeling each attribute as a "hash-map" with entity identifiers as keys. That is close to how column-based or key-value stores work. However, we still want to use mainstream relational (SQL) or document-based storage, and we want to retain the familiar `get`/`set` imperative syntax.
+
+ORM layers like Hibernate and even simpler tools like ActiveRecord start out with syntax that seems more minimal at first. However, as the application codebase scales up, the abstraction becomes "leaky", and the object-relational impedance mismatch remains a problem, now exacerbated by application size. Using the identity-based getters/setters is more flexible in the long run and allows for more pervasive unit testing. The Fxrm Store approach even allows to fall back and mix in "hand-coded" storage calls for certain optimized cases or niche storage engines.
 
 ## Working With Database Storage
 
