@@ -48,8 +48,8 @@ class MySQLBackend extends PDOBackend {
         return join('', $sql);
     }
 
-    protected function generateGetQuery($entity, $field) {
-        return 'SELECT `' . $field . '` AS v FROM `' . $entity . '` WHERE id = :id LIMIT 1';
+    protected function generateGetQuery($entity, $fieldList) {
+        return 'SELECT `' . implode('`, `', $fieldList) . '` FROM `' . $entity . '` WHERE id = :id LIMIT 1';
     }
 
     protected function generateSetQuery($entity, $fieldList) {

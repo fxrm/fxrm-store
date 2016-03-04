@@ -16,15 +16,22 @@ class MySQLFunctionalTest extends \PHPUnit_Framework_TestCase {
             use myapp_test;
             create table MyTest (id INT PRIMARY KEY AUTO_INCREMENT, testProp VARCHAR(255) NULL, testDate INT NULL);
             insert into MyTest (testProp, testDate) VALUES (\'v1\', 1), (\'v2\', 2);
+            create table MyTupleTest (id INT PRIMARY KEY AUTO_INCREMENT, test_myProp VARCHAR(255) NULL, test_myDate INT NULL);
+            insert into MyTupleTest (test_myProp, test_myDate) VALUES (\'v1\', 1), (\'v2\', 2);
         ');
 
-        $this->backend = new \Fxrm\Store\MySQLBackend($dsn . ';dbname=myapp_test', $user, $password);
+        $this->backend = new \Fxrm\Store\MySQLBackend($dsn . ';dbname=myapp_test', $user, $password, array(
+            'tuplePropertyList' => array(
+                'Foo\\MyTupleTestId.test'
+            )
+        ));
     }
 
     public function tearDown() {
         if ($this->pdo) {
             $this->pdo->exec('
                 drop table MyTest;
+                drop table MyTupleTest;
                 drop database myapp_test;
             ');
         }
@@ -40,9 +47,47 @@ class MySQLFunctionalTest extends \PHPUnit_Framework_TestCase {
         $this->assertEquals(2, $d->getTimestamp());
     }
 
+    public function testGetTuple() {
+        $d = $this->backend->get('\\', 'Foo\\MyTupleTestId', 1, array(
+            'myProp' => null,
+            'myDate' => Backend::DATE_TIME_TYPE
+        ), 'test');
+
+        $this->assertInstanceof('stdClass', $d);
+        $this->assertEquals('v1', $d->myProp);
+        $this->assertInstanceof('DateTime', $d->myDate);
+        $this->assertEquals(1, $d->myDate->getTimestamp());
+    }
+
     public function testSet() {
         $this->backend->set('\\', 'Foo\\MyTestId', 1, array('testProp' => null), array('testProp' => 'CHANGED'));
         $this->assertEquals(1, $this->backend->find('\\', 'Foo\\MyTestId', array('testProp' => null), array('testProp' => 'CHANGED'), null, false));
+    }
+
+    public function testSetTuple() {
+        $newTime = new \DateTime();
+
+        $this->backend->set('\\', 'Foo\\MyTupleTestId', 1, array(
+            'test' => array(
+                'myProp' => null,
+                'myDate' => Backend::DATE_TIME_TYPE
+            )
+        ), array(
+            'test' => (object)array(
+                'myProp' => 'CHANGED',
+                'myDate' => $newTime
+            )
+        ));
+
+        $d = $this->backend->get('\\', 'Foo\\MyTupleTestId', 1, array(
+            'myProp' => null,
+            'myDate' => Backend::DATE_TIME_TYPE
+        ), 'test');
+
+        $this->assertInstanceof('stdClass', $d);
+        $this->assertEquals('CHANGED', $d->myProp);
+        $this->assertInstanceof('DateTime', $d->myDate);
+        $this->assertEquals($newTime->getTimestamp(), $d->myDate->getTimestamp());
     }
 
     public function testMultiFind() {
@@ -73,6 +118,16 @@ class MySQLFunctionalTest extends \PHPUnit_Framework_TestCase {
     public function testSingleFindEmpty() {
         $result = $this->backend->find('\\', 'Foo\\MyTestId', array('testProp' => null), array('testProp' => 'NONEXISTENT'), null, false);
         $this->assertNull($result);
+    }
+
+    public function testMultiFindByTuple() {
+        $result = $this->backend->find('\\', 'Foo\\MyTupleTestId', array(
+            'test' => array('myProp' => null, 'myDate' => Backend::DATE_TIME_TYPE)
+        ), array(
+            'test' => (object)array('myProp' => 'v1', 'myDate' => new \DateTime('1970-01-01 00:00:01 UTC')
+        )), null, true);
+
+        $this->assertEquals(array(1), $result);
     }
 
     public function testSetJSON() {

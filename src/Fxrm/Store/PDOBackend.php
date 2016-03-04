@@ -8,12 +8,18 @@
 namespace Fxrm\Store;
 
 abstract class PDOBackend extends Backend {
+    const TUPLE_DELIMITER = '_';
+
     private $pdo;
     private $idGeneratorMap;
 
     function __construct($dsn, $user = null, $password = null, $options = array()) {
         $this->idGeneratorMap = array_key_exists('idGeneratorMap', $options)
             ? (array)$options['idGeneratorMap']
+            : array();
+
+        $this->tuplePropertyMap = array_key_exists('tuplePropertyList', $options)
+            ? array_fill_keys($options['tuplePropertyList'], null)
             : array();
 
         $this->pdo = new \PDO($dsn, $user, $password);
@@ -23,10 +29,23 @@ abstract class PDOBackend extends Backend {
     }
 
     final function find($method, $entity, $valueTypeMap, $valueMap, $returnType, $multiple) {
-        $stmt = $this->pdo->prepare($this->getCustomQuery($method) ?: $this->generateFindQuery($this->getEntityName($entity), array_keys($valueMap), $multiple));
+        $stmt = $this->pdo->prepare($this->getCustomQuery($method) ?: $this->generateFindQuery(
+            $this->getEntityName($entity),
+            $this->getFlattenedFieldList($entity, array_keys($valueMap), $valueTypeMap),
+            $multiple
+        ));
 
         foreach ($valueMap as $field => $value) {
-            $this->bindStatementValue($stmt, ':' . $field, $this->fromValue($valueTypeMap[$field], $value));
+            $valueType = $valueTypeMap[$field];
+
+            if ($this->getIsTupleProperty($entity, $field)) {
+                // null $value is not tolerated by design (@todo add explicit null check throw?)
+                foreach ($valueType as $k => $kType) {
+                    $this->bindStatementValue($stmt, ':' . $field . self::TUPLE_DELIMITER . $k, $this->fromValue($kType, $value->$k));
+                }
+            } else {
+                $this->bindStatementValue($stmt, ':' . $field, $this->fromValue($valueType, $value));
+            }
         }
 
         $stmt->execute();
@@ -52,15 +71,26 @@ abstract class PDOBackend extends Backend {
     }
 
     final function get($method, $entity, $id, $fieldType, $field) {
-        // @todo use the original model parameter name as query param
-        $sql = $this->getCustomQuery($method) ?: $this->generateGetQuery($this->getEntityName($entity), $field);
+        $isTuple = $this->getIsTupleProperty($entity, $field);
+        $fieldTuplePrefix = $field . self::TUPLE_DELIMITER;
+
+        // @todo use the original model parameter name as custom query param
+        $sql = $this->getCustomQuery($method) ?: $this->generateGetQuery(
+            $this->getEntityName($entity),
+            $isTuple ? array_map(
+                function ($k) use ($fieldTuplePrefix) { return $fieldTuplePrefix . $k; },
+                array_keys($fieldType)
+            ) : array($field)
+        );
 
         $stmt = $this->pdo->prepare($sql);
         $this->bindStatementValue($stmt, ':id', $id);
         $stmt->execute();
 
         // expecting only a single value per row
-        $rows = $stmt->fetchAll(\PDO::FETCH_COLUMN, 0);
+        $rows = $isTuple
+            ? $stmt->fetchAll(\PDO::FETCH_OBJ)
+            : $stmt->fetchAll(\PDO::FETCH_COLUMN, 0);
 
         $stmt->closeCursor();
 
@@ -69,17 +99,41 @@ abstract class PDOBackend extends Backend {
             throw new \Exception('object not found');
         }
 
-        return $this->toValue($fieldType, $rows[0]);
+        if ($isTuple) {
+            $data = $rows[0];
+            $result = (object)null;
+
+            foreach ($fieldType as $k => $type) {
+                $result->$k = $this->toValue($type, $data->{$field . self::TUPLE_DELIMITER . $k});
+            }
+
+            return $result;
+        } else {
+            return $this->toValue($fieldType, $rows[0]);
+        }
     }
 
     final function set($method, $entity, $id, $valueTypeMap, $valueMap) {
         // @todo use the original model parameter name as query param
-        $stmt = $this->pdo->prepare($this->getCustomQuery($method) ?: $this->generateSetQuery($this->getEntityName($entity), array_keys($valueMap)));
+        $stmt = $this->pdo->prepare($this->getCustomQuery($method) ?: $this->generateSetQuery(
+            $this->getEntityName($entity),
+            $this->getFlattenedFieldList($entity, array_keys($valueMap), $valueTypeMap)
+        ));
         $this->bindStatementValue($stmt, ':id', $id);
 
         $valueCount = 0;
         foreach ($valueMap as $field => $value) {
-            $this->bindStatementValue($stmt, ':' . $field, $this->fromValue($valueTypeMap[$field], $value));
+            $valueType = $valueTypeMap[$field];
+
+            if ($this->getIsTupleProperty($entity, $field)) {
+                // null $value is not tolerated by design (@todo add explicit null check throw?)
+                foreach ($valueType as $k => $kType) {
+                    $this->bindStatementValue($stmt, ':' . $field . self::TUPLE_DELIMITER . $k, $this->fromValue($kType, $value->$k));
+                }
+            } else {
+                $this->bindStatementValue($stmt, ':' . $field, $this->fromValue($valueType, $value));
+            }
+
             $valueCount += 1;
         }
 
@@ -259,6 +313,28 @@ abstract class PDOBackend extends Backend {
         return $result;
     }
 
+    private function getIsTupleProperty($entity, $field) {
+        return array_key_exists($entity . '.' . $field, $this->tuplePropertyMap);
+    }
+
+    private function getFlattenedFieldList($entity, $fieldList, &$valueTypeMap) {
+        $result = array();
+
+        foreach ($fieldList as $field) {
+            $valueType = $valueTypeMap[$field];
+
+            if ($this->getIsTupleProperty($entity, $field)) {
+                foreach ($valueType as $k => $kType) {
+                    $result[] = $field . self::TUPLE_DELIMITER . $k;
+                }
+            } else {
+                $result[] = $field;
+            }
+        }
+
+        return $result;
+    }
+
     private function getEntityName($idClass) {
         if ( ! preg_match('/([^\\\\]+)Id$/', $idClass, $idMatch)) {
             throw new \Exception('entity class must be an identity: ' . $idClass);
@@ -306,7 +382,7 @@ abstract class PDOBackend extends Backend {
 
     abstract protected function generateFindQuery($entity, $fieldList, $multiple);
 
-    abstract protected function generateGetQuery($entity, $field);
+    abstract protected function generateGetQuery($entity, $fieldList);
 
     abstract protected function generateSetQuery($entity, $fieldList);
 
